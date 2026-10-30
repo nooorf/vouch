@@ -30,11 +30,12 @@ export const demoBrief: Brief = {
       amountCents: 15000,
       dueInDays: 10,
       criteria: [
+        { kind: "check", id: "m2-http", checkId: "http_ok", params: {}, weight: 1, required: true },
         { kind: "check", id: "m2-viewport", checkId: "viewport_meta", params: {}, weight: 2, required: false },
         { kind: "check", id: "m2-alt", checkId: "img_alt_ratio", params: { minRatio: 0.9 }, weight: 2, required: false },
         { kind: "check", id: "m2-css", checkId: "responsive_css", params: {}, weight: 2, required: false },
         { kind: "check", id: "m2-a11y", checkId: "lighthouse_a11y", params: { min: 90 }, weight: 2, required: false },
-        { kind: "judged", id: "m2-mobile", rubric: "In the mobile screenshot, is the layout readable with no overlapping or cut-off content?", weight: 2, required: false, visual: true },
+        { kind: "judged", id: "m2-mobile", rubric: "In the mobile screenshot, is the layout readable with no overlapping or cut-off content?", weight: 1, required: false, visual: true },
       ],
     },
     {
@@ -44,6 +45,7 @@ export const demoBrief: Brief = {
       amountCents: 10000,
       dueInDays: 14,
       criteria: [
+        { kind: "check", id: "m3-http", checkId: "http_ok", params: {}, weight: 1, required: true },
         { kind: "check", id: "m3-form", checkId: "has_form", params: { fields: ["name", "email", "message"] }, weight: 3, required: true },
         { kind: "check", id: "m3-links", checkId: "links_ok", params: {}, weight: 2, required: false },
         { kind: "check", id: "m3-perf", checkId: "lighthouse_perf", params: { min: 70 }, weight: 2, required: false },

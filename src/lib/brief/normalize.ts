@@ -108,7 +108,15 @@ const clampInt = (v: unknown, lo: number, hi: number, fallback: number) => {
   return Math.min(hi, Math.max(lo, n));
 };
 
-function checkParams(checkId: CheckId, c: RawDraft["milestones"][number]["criteria"][number]) {
+/** Fields the model may use to set check params (shared with revise.ts). */
+export interface ParamFields {
+  min?: number;
+  maxKb?: number;
+  items?: string[];
+}
+
+/** Valid params for a check from the model's flat fields, or null if they can't be made valid. */
+export function checkParams(checkId: CheckId, c: ParamFields) {
   const items = (c.items ?? []).map((s) => s.trim()).filter(Boolean).slice(0, 10);
   let params: Record<string, unknown>;
   switch (checkId) {

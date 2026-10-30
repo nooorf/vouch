@@ -27,6 +27,10 @@ function describe(e: Event): string {
       return `accepted brief v${p.version}`;
     case "brief.changes_requested":
       return `asked for changes to v${p.version}: “${p.note}”`;
+    case "brief.client_proposed":
+      return `proposed v${p.version} with AI-drafted edits: “${p.note}”`;
+    case "brief.revising":
+      return `started revising the client's v${p.from}`;
     case "brief.agreed":
       return `accepted brief v${p.version}. Both sides agreed on the same version.`;
     default:

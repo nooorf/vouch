@@ -3,15 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
 import { Activity } from "@/components/activity";
-import { BriefView } from "@/components/brief-view";
+import { BriefView, VersionChanges } from "@/components/brief-view";
 import { CopyLink, JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { MoneyBar } from "@/components/money-bar";
 import { Badge, Card, Container, LinkButton } from "@/components/ui";
 import { db, schema } from "@/db";
+import { diffBriefs } from "@/lib/brief/diff";
 import { clientUrlFor } from "@/lib/jobs/agreement";
 import { stepIndex } from "@/lib/jobs/status";
 import { formatCents } from "@/lib/money";
 import { requireUser } from "@/lib/session";
+import { ProposalActions } from "./proposal-actions";
 
 export const metadata: Metadata = { title: "Job" };
 
@@ -41,6 +43,8 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   const clientUrl = clientUrlFor(job);
   const clientPath = clientUrl ? new URL(clientUrl).pathname : null;
   const justSent = search.sent === "1";
+  const clientProposal = job.status === "PROPOSED" && latest.proposedBy === "client" ? latest : null;
+  const beforeProposal = clientProposal ? versions.find((v) => v.versionNo === clientProposal.versionNo - 1) : undefined;
 
   return (
     <Container className="py-10">
@@ -71,6 +75,18 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
               </LinkButton>
             </Card>
           )}
+          {clientProposal && (
+            <Card className="border-info/40 p-5">
+              <Badge tone="info">The client proposed v{clientProposal.versionNo}</Badge>
+              {clientProposal.changeRequest && <blockquote className="mt-3 border-l-2 border-info/50 pl-3 text-pretty">{clientProposal.changeRequest}</blockquote>}
+              <p className="mt-3 text-sm text-muted">
+                AI drafted these edits from the client&apos;s request and the client accepted them. Accept to lock the brief, or revise it and send your own
+                version.
+              </p>
+              <ProposalActions jobId={job.id} versionId={clientProposal.id} hash={clientProposal.contentHash} versionNo={clientProposal.versionNo} />
+            </Card>
+          )}
+          {clientProposal && beforeProposal && <VersionChanges changes={diffBriefs(beforeProposal.content, clientProposal.content)} fromVersion={beforeProposal.versionNo} />}
           <BriefView brief={shown.content} />
         </div>
 
@@ -99,7 +115,13 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
                 <p className="mt-2 text-sm text-muted">Revise the brief and send v{latest.versionNo}. The client keeps the same link.</p>
               </>
             )}
-            {job.status === "PROPOSED" && (
+            {clientProposal && (
+              <>
+                <h2 className="font-semibold">Your turn</h2>
+                <p className="mt-2 text-sm text-muted">The client proposed v{clientProposal.versionNo}. Accept it to lock the brief, or revise it.</p>
+              </>
+            )}
+            {job.status === "PROPOSED" && !clientProposal && (
               <>
                 <h2 className="font-semibold">{justSent ? `Sent v${latest.versionNo} to the client` : "Waiting for the client"}</h2>
                 <p className="mt-2 text-sm text-muted">

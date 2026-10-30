@@ -12,6 +12,7 @@ Day 1. Done so far:
 
 - App shell: landing page, "Try the demo" (a private demo workspace per visitor, signed session cookie) and the freelancer dashboard with the money bar.
 - Job creation: describe the work, Gemini drafts a brief (structured JSON, repaired and validated in code), then a full editor with live lint warnings and the share of each payment backed by measured checks.
+- Negotiation: the brief goes to the client at a private link; the client accepts, sends a note, or has AI turn their request into concrete edits (applied and diffed in code); both sides must accept the same version before funding.
 - `src/lib/policy/`: the policy engine (verdicts, partial releases, review window, capture guards), with tests.
 - `src/lib/brief/`: the brief schema, check library, agreement hash and demo brief, with tests.
 - `src/db/`: Postgres schema (Drizzle) for jobs, brief versions, milestones, evaluations, payments, the event ledger and a task queue; migrations in `drizzle/`.

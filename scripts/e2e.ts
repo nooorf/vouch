@@ -122,7 +122,7 @@ async function main() {
     await step("Client requests changes", async () => {
       await clickByText(page, "button", "Request changes");
       await page.type("#note", "Please make the first milestone $210 and keep the total fair.");
-      await clickByText(page, "button", "Send request");
+      await clickByText(page, "button", "Send as a note instead");
       await text("Being revised");
     });
 
@@ -141,19 +141,38 @@ async function main() {
       await text("Sent v2 to the client");
     });
 
-    await step("Client sees what changed and accepts v2", async () => {
+    await step("Client sees what changed in v2", async () => {
       await nav(() => clickByText(page, "a", "Client"));
       await text("What changed since v1");
       await text("Amount:");
-      await clickByText(page, "button", "Accept this brief");
-      await text("You and Sam Rivera agreed on v2");
+    });
+
+    await step("Client asks AI to draft a change and proposes v3", async () => {
+      await clickByText(page, "button", "Request changes");
+      await page.type("#note", "Please also make sure the page mentions our café locations: Shoreditch and Hackney.");
+      await clickByText(page, "button", "Draft the changes with AI");
+      await text("Shoreditch", 150_000);
+      await clickByText(page, "button", "Propose v3 to Sam Rivera");
+      await text("Your proposal");
+    });
+    await shot(page, "client-proposed");
+
+    await step("Freelancer accepts the client's v3 in one click", async () => {
+      await nav(() => clickByText(page, "a", "Freelancer"));
+      await text("The client proposed v3");
+      await clickByText(page, "button", "Accept v3");
+      await text("Agreed on v3");
+      await text("Both sides agreed on the same version");
+    });
+
+    await step("Client sees the agreed brief", async () => {
+      await nav(() => clickByText(page, "a", "Client"));
+      await text("You and Sam Rivera agreed on v3");
     });
     await shot(page, "client-agreed");
 
-    await step("Freelancer sees the agreed, locked brief", async () => {
+    await step("The agreed brief is locked", async () => {
       await nav(() => clickByText(page, "a", "Freelancer"));
-      await text("Agreed on v2");
-      await text("Both sides agreed on the same version");
       const res = await page.goto(page.url().replace(/\?.*$/, "") + "/brief", { waitUntil: "networkidle0" });
       if (!res || !/\/jobs\/[0-9a-f-]+$/.test(page.url())) throw new Error(`Editor still reachable: ${page.url()}`);
     });

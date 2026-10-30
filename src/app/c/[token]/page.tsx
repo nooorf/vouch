@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { BriefView, VersionChanges } from "@/components/brief-view";
 import { JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { Badge, Card, Container } from "@/components/ui";
@@ -27,13 +27,14 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
     .where(eq(schema.briefVersions.jobId, job.id))
     .orderBy(desc(schema.briefVersions.versionNo));
 
-  // Only versions the freelancer actually sent are visible to the client.
+  // Only versions someone put forward (sent by the freelancer or proposed by the client) are visible.
+  // The freelancer's unsent drafts never are.
   const sentIds = new Set(
     (
       await db
         .select({ id: schema.approvals.briefVersionId })
         .from(schema.approvals)
-        .where(and(inArray(schema.approvals.briefVersionId, versions.map((v) => v.id)), eq(schema.approvals.party, "freelancer")))
+        .where(inArray(schema.approvals.briefVersionId, versions.map((v) => v.id)))
     ).map((r) => r.id),
   );
   const sent = versions.filter((v) => sentIds.has(v.id));
@@ -72,8 +73,25 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
         </div>
 
         <aside className="lg:sticky lg:top-6 lg:self-start">
-          {job.status === "PROPOSED" && (
-            <ClientActions token={token} versionId={shown.id} hash={shown.contentHash} totalCents={shown.content.totalCents} versionNo={shown.versionNo} />
+          {job.status === "PROPOSED" && shown.proposedBy !== "client" && (
+            <ClientActions
+              token={token}
+              versionId={shown.id}
+              hash={shown.contentHash}
+              totalCents={shown.content.totalCents}
+              versionNo={shown.versionNo}
+              freelancerName={owner?.name ?? "the freelancer"}
+            />
+          )}
+          {job.status === "PROPOSED" && shown.proposedBy === "client" && (
+            <Card className="p-5">
+              <Badge tone="info">Your proposal</Badge>
+              <p className="mt-3 text-sm">
+                You proposed v{shown.versionNo}. {owner?.name ?? "The freelancer"} can accept it as is, which locks the brief, or revise it.
+              </p>
+              {shown.changeRequest && <blockquote className="mt-3 border-l-2 border-line pl-3 text-sm text-muted">{shown.changeRequest}</blockquote>}
+              <p className="tabular mt-4 font-mono text-2xl font-semibold">{formatCents(shown.content.totalCents)}</p>
+            </Card>
           )}
           {job.status === "DRAFT" && (
             <Card className="p-5">

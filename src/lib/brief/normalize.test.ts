@@ -106,6 +106,6 @@ describe("lintBrief", () => {
   });
 
   it("computes the measured share of a milestone", () => {
-    expect(measuredShare(demoBrief.milestones[1])).toBeCloseTo(0.8);
+    expect(measuredShare(demoBrief.milestones[1])).toBeCloseTo(0.9);
   });
 });
