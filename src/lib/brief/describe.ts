@@ -12,7 +12,7 @@ export function describeCriterion(c: Criterion): string {
     case "http_ok":
       return "The page loads over HTTPS in under 5 seconds";
     case "has_h1":
-      return "The page has exactly one main heading";
+      return "The page has a main heading";
     case "min_sections":
       return `The page has at least ${p.min} content sections`;
     case "viewport_meta":
@@ -29,6 +29,12 @@ export function describeCriterion(c: Criterion): string {
       return "No leftover placeholder text (Lorem ipsum and the like)";
     case "links_ok":
       return "Internal links work (up to 10 checked)";
+    case "no_js_errors":
+      return "The app runs without JavaScript errors in a real browser";
+    case "no_failed_requests":
+      return "Every API call answers and the site's files load";
+    case "no_horizontal_scroll":
+      return "Nothing spills off the side on a phone";
     case "page_weight":
       return `The HTML is under ${p.maxKb} KB`;
     case "lighthouse_a11y":

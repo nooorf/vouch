@@ -14,7 +14,7 @@ const input =
 const small = "rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
 
 const uid = () => Math.random().toString(36).slice(2, 8);
-const GROUPS = { page: "Page", lighthouse: "Google Lighthouse", repo: "GitHub repo" } as const;
+const GROUPS = { page: "Page", app: "Web app (checked in a real browser)", lighthouse: "Google Lighthouse", repo: "GitHub repo" } as const;
 
 /* ------------------------------------------------------------------ */
 /* Small inputs                                                         */

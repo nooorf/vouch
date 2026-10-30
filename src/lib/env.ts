@@ -41,6 +41,11 @@ const EnvSchema = z
     RESEND_API_KEY: opt(z.string().startsWith("re_", "RESEND_API_KEY starts with re_")),
     EMAIL_FROM: z.preprocess((v) => (v === "" ? undefined : v), z.string().default("onboarding@resend.dev")),
     CRON_SECRET: opt(z.string().min(16)),
+    /** How the referee renders web apps: Kernel cloud browsers, a local Chrome, or not at all. */
+    RENDERER: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["auto", "kernel", "chrome", "none"]).default("auto")),
+    KERNEL_API_KEY: opt(z.string().min(10)),
+    /** Local Chrome for the "chrome" renderer (auto-detected on macOS). */
+    CHROME_PATH: opt(z.string().min(1)),
     /** Review window for demo jobs, so judges can watch the silence rule release money. */
     DEMO_REVIEW_WINDOW_SECONDS: z.preprocess((v) => (v === "" || v === undefined ? undefined : Number(v)), z.number().int().min(10).max(86_400).default(120)),
     /** Local development only: let the referee fetch http://localhost (e.g. the demo sites). */
@@ -101,6 +106,7 @@ export const FEATURES = {
   paypalWebhooks: { label: "PayPal webhooks", needs: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET", "PAYPAL_WEBHOOK_ID"] },
   ai: { label: "AI (Gemini)", needs: ["GEMINI_API_KEY"] },
   githubChecks: { label: "GitHub repo checks", needs: ["GITHUB_TOKEN"] },
+  kernel: { label: "Web app rendering in Kernel cloud browsers", needs: ["KERNEL_API_KEY"] },
   pagespeed: { label: "Lighthouse via PageSpeed (the keyless quota is shared and often used up)", needs: ["PAGESPEED_API_KEY"] },
   email: { label: "Email (Resend)", needs: ["RESEND_API_KEY"] },
   cron: { label: "External cron endpoint", needs: ["CRON_SECRET"] },

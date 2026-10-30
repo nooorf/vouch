@@ -14,7 +14,7 @@ import { paypal, usd } from "../src/lib/paypal/client";
 import { completeFunding } from "../src/lib/paypal/funding";
 
 const BASE = (process.env.E2E_URL ?? "http://localhost:3000").replace(/\/$/, "");
-const CHROME = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const SHOTS = process.env.E2E_SHOTS;
 /**
  * How the walk-through funds the job:
@@ -349,7 +349,7 @@ async function main() {
 
       await step("The referee checks it and shows a verdict with evidence", async () => {
         await page.waitForFunction(() => /Passed|Partly met|Not met|Needs a person/.test(document.body.innerText) && !document.body.innerText.includes("Checking the delivery"), { timeout: 180_000 });
-        await text("One main heading");
+        await text("Main heading");
         await text("AI ·");
       });
       await shot(page, "evaluation-freelancer");
@@ -438,8 +438,8 @@ async function main() {
 
 main()
   .then(() => console.log(failures ? `\n${failures} step(s) failed` : "\nAll steps passed"))
-  .catch(() => {
-    console.log("\nE2E failed");
+  .catch((err) => {
+    console.log(`\nE2E failed: ${err instanceof Error ? err.message : err}`);
     process.exitCode = 1;
   })
   .finally(closeDb);

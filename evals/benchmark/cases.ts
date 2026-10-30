@@ -49,6 +49,7 @@ const todoBrief: Criterion[] = [
   check("t-viewport", "viewport_meta", 2),
   check("t-h1", "has_h1", 2),
   check("t-text", "has_text", 2, { phrases: ["todos", "Double-click to edit a todo"] }),
+  check("t-js", "no_js_errors", 2),
   check("t-a11y", "lighthouse_a11y", 2, { min: 80 }),
   judged("t-app", "Does the page show a todo list app with a text field for adding a new todo?", 3, { visual: true }),
 ];
@@ -58,6 +59,7 @@ const conduitBrief: Criterion[] = [
   check("r-viewport", "viewport_meta", 1),
   check("r-text", "has_text", 2, { phrases: ["Global Feed", "A place to share your"] }),
   check("r-links", "links_ok", 1),
+  check("r-api", "no_failed_requests", 3),
   check("r-a11y", "lighthouse_a11y", 2, { min: 80 }),
   judged("r-feed", "Does the home page show a feed with at least one article, including its title and its author?", 4, { required: true }),
   judged("r-mobile", "In the phone screenshot, is the layout readable, with nothing overlapping or cut off?", 2, { visual: true }),
@@ -91,7 +93,7 @@ const todo = (impl: string, label: string): BenchCase => ({
   kind: "client-rendered app",
   criteria: todoBrief,
   truth: ["PASS", "PARTIAL"], // PARTIAL only if Lighthouse accessibility lands under 80
-  labels: { "t-http": true, "t-viewport": true, "t-h1": true, "t-text": true, "t-app": true },
+  labels: { "t-http": true, "t-viewport": true, "t-h1": true, "t-text": true, "t-js": true, "t-app": true },
   why: "A working todo app whose HTML is an empty shell until JavaScript runs.",
 });
 
@@ -106,7 +108,7 @@ export const CASES: BenchCase[] = [
     kind: "client-rendered app",
     criteria: conduitBrief,
     truth: ["PASS", "PARTIAL"],
-    labels: { "r-http": true, "r-viewport": true, "r-text": true, "r-feed": true },
+    labels: { "r-http": true, "r-viewport": true, "r-text": true, "r-api": true, "r-feed": true },
     why: "A working blogging app, rendered in the browser: the feed shows 4 articles.",
   },
   {
@@ -116,7 +118,7 @@ export const CASES: BenchCase[] = [
     kind: "server-rendered app",
     criteria: conduitBrief,
     truth: ["PASS", "PARTIAL"],
-    labels: { "r-http": true, "r-viewport": true, "r-text": true, "r-feed": true },
+    labels: { "r-http": true, "r-viewport": true, "r-text": true, "r-api": true, "r-feed": true },
     why: "The same app rendered on the server: the feed shows 4 articles.",
   },
   {
@@ -126,7 +128,7 @@ export const CASES: BenchCase[] = [
     kind: "client-rendered app",
     criteria: conduitBrief,
     truth: ["FAIL"],
-    labels: { "r-http": true, "r-viewport": true, "r-text": true, "r-feed": false },
+    labels: { "r-http": true, "r-viewport": true, "r-text": true, "r-api": false, "r-feed": false },
     why: "Loads, but shows “Loading articles…” forever: its API no longer answers.",
   },
   {
@@ -136,8 +138,8 @@ export const CASES: BenchCase[] = [
     kind: "server-rendered app",
     criteria: conduitBrief,
     truth: ["FAIL"],
-    labels: { "r-http": true, "r-viewport": true, "r-text": true, "r-feed": false },
-    why: "Renders the page shell, but the feed is empty: the data never loads.",
+    labels: { "r-http": true, "r-viewport": true, "r-text": true, "r-api": false, "r-feed": false },
+    why: "Renders the page shell, but the feed is empty: its API (api.realworld.io) no longer answers.",
   },
   {
     id: "agency-template",

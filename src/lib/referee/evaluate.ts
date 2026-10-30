@@ -107,7 +107,14 @@ export async function assessDelivery(input: AssessInput): Promise<Assessment> {
         url: report.page.finalUrl,
         title: report.page.title,
         pageText: report.pageText,
-        facts: report.checks.map((c) => `${c.label}: ${c.status} (${c.evidence})`),
+        facts: [
+          ...report.checks.map((c) => `${c.label}: ${c.status} (${c.evidence})`),
+          ...(report.rendered
+            ? [
+                `Loaded in a real browser (phone, then desktop): ${report.rendered.pageErrors.length} JavaScript error(s), ${report.rendered.failedRequests.length} failed or unanswered request(s)${report.rendered.failedRequests.length ? `: ${report.rendered.failedRequests.slice(0, 3).map((f) => `${f.url.slice(0, 80)} (${f.reason})`).join("; ")}` : ""}`,
+              ]
+            : [`Not loaded in a real browser (${report.renderError ?? "unavailable"}): the page text is the HTML as sent, before any JavaScript ran.`]),
+        ],
         screenshot: report.screenshot,
         objection: input.objection ?? null,
       });

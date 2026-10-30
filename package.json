@@ -31,6 +31,7 @@
     "geist": "1.8.2",
     "next": "16.4.3",
     "postgres": "4.0.0",
+    "puppeteer-core": "25.16.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.7"
@@ -43,7 +44,6 @@
     "drizzle-kit": "0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
-    "puppeteer-core": "25.16.0",
     "tailwindcss": "^4",
     "tsx": "4.23.15",
     "typescript": "^5",

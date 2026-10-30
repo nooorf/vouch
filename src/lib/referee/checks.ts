@@ -3,6 +3,7 @@ import type { RepoOutcome } from "./github";
 import { fold, type Page } from "./page";
 import { findPlaceholders } from "./placeholder";
 import type { PageSpeedOutcome } from "./pagespeed";
+import type { RenderedPage } from "./render";
 
 /**
  * The measured checks. Each one reads facts (the fetched page, Lighthouse, GitHub) and returns
@@ -27,6 +28,10 @@ export interface CheckContext {
   allowHttp?: boolean;
   /** The page couldn't be reached for network reasons (possibly ours): checks report "error", not "fail". */
   unreachable?: boolean;
+  /** The page as loaded in a real browser, when a renderer is available. */
+  rendered?: RenderedPage | null;
+  /** Why it wasn't rendered, if it wasn't. */
+  renderError?: string;
 }
 
 const pass = (evidence: string, measured?: Record<string, unknown>): CheckOutcome => ({ status: "pass", evidence, measured });
@@ -53,10 +58,12 @@ function httpOk(ctx: CheckContext): CheckOutcome {
 function hasH1(page: Page): CheckOutcome {
   const h1s = page.$("h1")
     .map((_, el) => page.$(el).text().trim())
-    .get();
-  if (h1s.length === 1) return pass(`One main heading: ${quote(h1s[0])}.`, { count: 1 });
+    .get()
+    .filter(Boolean);
   if (h1s.length === 0) return fail("The page has no main heading (h1).", { count: 0 });
-  return fail(`The page has ${h1s.length} main headings: ${h1s.slice(0, 3).map(quote).join(", ")}.`, { count: h1s.length });
+  if (h1s.length === 1) return pass(`Main heading: ${quote(h1s[0])}.`, { count: 1 });
+  // Valid HTML, and common in apps (e.g. one h1 per article card): pass, and say so.
+  return pass(`Main heading: ${quote(h1s[0])} (${h1s.length} headings are marked as h1; one is best practice).`, { count: h1s.length });
 }
 
 function minSections(page: Page, min: number): CheckOutcome {
@@ -200,6 +207,37 @@ function pageWeight(page: Page, maxKb: number): CheckOutcome {
   return kb <= maxKb ? pass(`The HTML is ${kb} KB (limit ${maxKb} KB).`, { kb }) : fail(`The HTML is ${kb} KB, over the ${maxKb} KB limit.`, { kb });
 }
 
+/* ---------------- real browser ---------------- */
+
+function needsBrowser(ctx: CheckContext): CheckOutcome | null {
+  if (ctx.rendered) return null;
+  return error(`Not measured: ${(ctx.renderError ?? "no browser is available to load the page").replace(/\.$/, "")}.`);
+}
+
+function noJsErrors(ctx: CheckContext): CheckOutcome {
+  const r = ctx.rendered!;
+  const noise = r.consoleErrors.length ? ` (${plural(r.consoleErrors.length, "console message")} logged, not counted)` : "";
+  if (!r.pageErrors.length) return pass(`No JavaScript errors while loading on a phone and a desktop${noise}.`, { consoleErrors: r.consoleErrors.length });
+  return fail(`${plural(r.pageErrors.length, "JavaScript error")}: ${r.pageErrors.slice(0, 2).map(quote).join(", ")}.`, { pageErrors: r.pageErrors });
+}
+
+function noFailedRequests(ctx: CheckContext): CheckOutcome {
+  const r = ctx.rendered!;
+  if (!r.failedRequests.length) return pass("Every API call answered and the site's own files loaded.");
+  const shown = r.failedRequests.slice(0, 3).map((f) => {
+    const u = new URL(f.url);
+    return `${f.type === "xhr" || f.type === "fetch" ? "API call" : f.type} ${u.host}${u.pathname.slice(0, 40)} (${f.reason})`;
+  });
+  return fail(`${plural(r.failedRequests.length, "request")} failed: ${shown.join("; ")}.`, { failed: r.failedRequests });
+}
+
+function noHorizontalScroll(ctx: CheckContext): CheckOutcome {
+  const m = ctx.rendered!.mobile;
+  return m.horizontalOverflow
+    ? fail(`On a ${m.width}px phone the page is ${m.scrollWidth}px wide, so content spills off the side.`, { scrollWidth: m.scrollWidth })
+    : pass(`Fits a ${m.width}px phone screen.`, { scrollWidth: m.scrollWidth });
+}
+
 /* ---------------- Lighthouse ---------------- */
 
 async function lighthouse(ctx: CheckContext, category: "accessibility" | "performance" | "seo", min: number): Promise<CheckOutcome> {
@@ -242,6 +280,11 @@ export async function runCheck(checkId: CheckId, params: Record<string, unknown>
   if (checkId === "lighthouse_perf") return lighthouse(ctx, "performance", Number(params.min));
   if (checkId === "lighthouse_seo") return lighthouse(ctx, "seo", Number(params.min));
   if (checkId === "repo_readme" || checkId === "repo_fresh_commits" || checkId === "ci_passing") return repoCheck(ctx, checkId);
+  if (checkId === "no_js_errors" || checkId === "no_failed_requests" || checkId === "no_horizontal_scroll") {
+    const missing = needsBrowser(ctx);
+    if (missing) return missing;
+    return checkId === "no_js_errors" ? noJsErrors(ctx) : checkId === "no_failed_requests" ? noFailedRequests(ctx) : noHorizontalScroll(ctx);
+  }
 
   const page = ctx.page;
   if (!page && ctx.unreachable) return error(`Not checked: the page couldn't be reached.`);

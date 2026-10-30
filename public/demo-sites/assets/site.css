@@ -1,5 +1,6 @@
 :root { --ink: #2b1d14; --muted: #5c4a3d; --bg: #fbf7f2; --accent: #8a3b12; --card: #ffffff; --line: #e8ddd2; }
 * { box-sizing: border-box; }
+img { max-width: 100%; height: auto; }
 body { margin: 0; font-family: Georgia, "Times New Roman", serif; color: var(--ink); background: var(--bg); line-height: 1.6; }
 a { color: var(--accent); }
 header, section, footer { padding: 3rem 1.25rem; }

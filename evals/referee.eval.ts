@@ -79,7 +79,12 @@ ${misses.join("\n") || "None."}
 export const refereeSuite: Suite<BenchCase, RefereeOutput> = {
   name: "referee",
   async run(c) {
-    const a = await assessDelivery({
+    // The benchmark measures the referee, not our connection: retry a case whose page couldn't be
+    // reached or rendered for network reasons (up to twice).
+    const networkTrouble = (x: Awaited<ReturnType<typeof assessDelivery>>) =>
+      x.results.some((r) => r.status === "error" && /couldn't be reached|ENOTFOUND|EAI_AGAIN|ERR_CONNECTION|ERR_QUIC|ERR_NAME|ECONNRESET/.test(`${r.evidence} ${r.explanation ?? ""}`)) ||
+      /ERR_CONNECTION|ERR_QUIC|ERR_NAME|ECONNRESET/.test(x.report.renderError ?? "");
+    let a = await assessDelivery({
       url: c.url,
       repoUrl: c.repoUrl ?? null,
       criteria: c.criteria,
@@ -87,6 +92,11 @@ export const refereeSuite: Suite<BenchCase, RefereeOutput> = {
       milestoneAmountCents: 10_000,
       alreadyReleasedCents: 0,
     });
+    for (let retry = 1; retry <= 2 && networkTrouble(a); retry++) {
+      console.log(`    (network trouble reaching ${new URL(c.url).host}; retry ${retry})`);
+      await new Promise((r) => setTimeout(r, 4000));
+      a = await assessDelivery({ url: c.url, repoUrl: c.repoUrl ?? null, criteria: c.criteria, fundedAt: new Date(Date.now() - 30 * 86_400_000), milestoneAmountCents: 10_000, alreadyReleasedCents: 0 });
+    }
     const ps = a.report.pagespeed;
     return {
       output: {

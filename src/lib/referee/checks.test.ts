@@ -5,6 +5,7 @@ import type { CheckId } from "@/lib/brief/checks";
 import { DEFAULT_PARAMS } from "@/lib/brief/checks";
 import { runCheck, type CheckContext } from "./checks";
 import { parsePage } from "./page";
+import type { RenderedPage } from "./render";
 import { findSuspicious } from "./suspicious";
 
 const PUBLIC = path.resolve(__dirname, "../../../public");
@@ -117,6 +118,31 @@ describe("measured checks on the demo sites", () => {
     const ctx: CheckContext = { ...ctxFor("good"), page: null, unreachable: true, fetchError: "Couldn't look up example.com (ENOTFOUND)." };
     expect((await runCheck("http_ok", {}, ctx)).status).toBe("error");
     expect((await runCheck("has_h1", {}, ctx)).status).toBe("error");
+  });
+
+  it("passes pages with several h1 headings, and says so", async () => {
+    const page = parsePage({ url: ORIGIN, finalUrl: ORIGIN, status: 200, ms: 1, bytes: 1, truncated: false, html: "<body><h1>conduit</h1><h1>First post</h1><h1>Second post</h1></body>" });
+    const r = await runCheck("has_h1", {}, { ...ctxFor("good"), page });
+    expect(r).toMatchObject({ status: "pass", evidence: "Main heading: “conduit” (3 headings are marked as h1; one is best practice)." });
+  });
+
+  it("measures web-app behaviour in a real browser, and reports 'not measured' without one", async () => {
+    const rendered = (over: Partial<RenderedPage>): RenderedPage => ({
+      renderer: "chrome", finalUrl: ORIGIN, status: 200, html: "", ms: 900, pageErrors: [], consoleErrors: [], failedRequests: [], blockedRequests: [],
+      mobile: { width: 390, horizontalOverflow: false, scrollWidth: 390, screenshot: null },
+      desktop: { width: 1366, horizontalOverflow: false, scrollWidth: 1366, screenshot: null },
+      ...over,
+    });
+    const base = ctxFor("good");
+    const crashed = { ...base, rendered: rendered({ pageErrors: ["TypeError: x is undefined"], consoleErrors: ["noise"] }) };
+    expect(await runCheck("no_js_errors", {}, crashed)).toMatchObject({ status: "fail", evidence: "1 JavaScript error: “TypeError: x is undefined”." });
+    const noisy = { ...base, rendered: rendered({ consoleErrors: ["third-party warning"] }) };
+    expect((await runCheck("no_js_errors", {}, noisy)).status).toBe("pass");
+    const deadApi = { ...base, rendered: rendered({ failedRequests: [{ url: "https://api.example.com/articles", status: null, type: "fetch", reason: "no response after 20 s" }] }) };
+    expect((await runCheck("no_failed_requests", {}, deadApi)).evidence).toBe("1 request failed: API call api.example.com/articles (no response after 20 s).");
+    const wide = { ...base, rendered: rendered({ mobile: { width: 390, horizontalOverflow: true, scrollWidth: 960, screenshot: null } }) };
+    expect((await runCheck("no_horizontal_scroll", {}, wide)).evidence).toMatch(/is 960px wide, so content spills off the side/);
+    expect(await runCheck("no_js_errors", {}, { ...base, rendered: null, renderError: "no browser is available on this server" })).toMatchObject({ status: "error" });
   });
 
   it("requires HTTPS", async () => {

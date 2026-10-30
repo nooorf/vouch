@@ -210,6 +210,15 @@ export function EvaluationCard({
         ))}
       </ul>
 
+      {report?.rendered && (
+        <p className="mt-3 text-xs text-muted">
+          Loaded in a real browser ({report.rendered.renderer === "kernel" ? "Kernel cloud browser" : "Chrome"}, phone then desktop):{" "}
+          {report.rendered.pageErrors.length ? `${report.rendered.pageErrors.length} JavaScript error(s)` : "no JavaScript errors"} ·{" "}
+          {report.rendered.failedRequests.length ? `${report.rendered.failedRequests.length} failed request(s)` : "every request answered"} ·{" "}
+          {report.rendered.mobileOverflow ? "spills off a phone screen" : "fits a phone screen"}
+        </p>
+      )}
+      {report && !report.rendered && report.renderError && <p className="mt-3 text-xs text-muted">Not loaded in a real browser: {report.renderError}.</p>}
       {ps?.ok && (
         <p className="mt-3 text-xs text-muted">
           Google Lighthouse (mobile): accessibility {ps.scores.accessibility ?? "–"} · performance {ps.scores.performance ?? "–"} · SEO {ps.scores.seo ?? "–"}

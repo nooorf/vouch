@@ -10,7 +10,7 @@ interface CheckDef {
   label: string;
   /** One line for the AI prompt and the editor's help text. */
   help: string;
-  group: "page" | "lighthouse" | "repo";
+  group: "page" | "app" | "lighthouse" | "repo";
   params: z.ZodType;
   fields: ParamField[];
 }
@@ -28,8 +28,8 @@ export const CHECKS = {
     fields: [],
   },
   has_h1: {
-    label: "One main heading",
-    help: "Page has exactly one h1.",
+    label: "Has a main heading",
+    help: "Page has a main heading (h1).",
     group: "page",
     params: z.object({}),
     fields: [],
@@ -97,6 +97,28 @@ export const CHECKS = {
     params: z.object({ maxKb: z.number().int().min(10).max(5000) }),
     fields: [{ key: "maxKb", type: "int", label: "At most", min: 10, max: 5000, suffix: "KB" }],
   },
+  // Measured in a real browser (needed for web apps that render with JavaScript).
+  no_js_errors: {
+    label: "Runs without JavaScript errors",
+    help: "Loaded in a real browser, the page throws no uncaught JavaScript errors.",
+    group: "app",
+    params: z.object({}),
+    fields: [],
+  },
+  no_failed_requests: {
+    label: "No failed requests",
+    help: "In a real browser, every API call answers and the site's own scripts, styles and images load (no errors, no 4xx/5xx).",
+    group: "app",
+    params: z.object({}),
+    fields: [],
+  },
+  no_horizontal_scroll: {
+    label: "Fits a phone screen",
+    help: "On a 390-pixel-wide phone, nothing spills off the side of the screen.",
+    group: "app",
+    params: z.object({}),
+    fields: [],
+  },
   lighthouse_a11y: {
     label: "Lighthouse accessibility",
     help: "Google Lighthouse accessibility score on mobile is at least N (0-100).",
@@ -161,6 +183,9 @@ export const DEFAULT_PARAMS: Record<CheckId, Record<string, unknown>> = {
   no_placeholder_text: {},
   links_ok: {},
   page_weight: { maxKb: 500 },
+  no_js_errors: {},
+  no_failed_requests: {},
+  no_horizontal_scroll: {},
   lighthouse_a11y: { min: 90 },
   lighthouse_perf: { min: 70 },
   lighthouse_seo: { min: 90 },

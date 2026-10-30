@@ -6,7 +6,7 @@ import { diffBriefs } from "./diff";
 describe("describeCriterion", () => {
   it("reads like plain English", () => {
     const [, h1, sections, text, copy] = demoBrief.milestones[0].criteria;
-    expect(describeCriterion(h1)).toBe("The page has exactly one main heading");
+    expect(describeCriterion(h1)).toBe("The page has a main heading");
     expect(describeCriterion(sections)).toBe("The page has at least 4 content sections");
     expect(describeCriterion(text)).toBe("The page mentions “single-origin”, “wholesale”");
     expect(describeCriterion(copy)).toMatch(/specialty coffee roastery/);
