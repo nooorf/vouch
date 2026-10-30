@@ -15,6 +15,7 @@
  * the policy, but not graded: we only label what a person can say for sure.
  */
 import { demoBrief } from "../../src/lib/brief/demo";
+import { CODE_CASES } from "./code-cases";
 import type { Criterion } from "../../src/lib/brief/schema";
 import type { Verdict } from "../../src/lib/policy/policy";
 
@@ -36,7 +37,8 @@ export interface BenchCase {
     | "server error"
     | "slow page"
     | "insecure link"
-    | "not mobile-friendly";
+    | "not mobile-friendly"
+    | "repository";
   criteria: Criterion[];
   /** Verdicts a careful reviewer would accept. */
   truth: Verdict[];
@@ -276,7 +278,7 @@ export const HELDOUT_CASES: BenchCase[] = [
   {
     set: "heldout",
     id: "books-toscrape",
-    title: "Books to Scrape (server-rendered catalogue)",
+    title: "Books to Scrape (says it's a demo with random prices)",
     url: "https://books.toscrape.com/",
     kind: "server-rendered app",
     criteria: [
@@ -284,9 +286,11 @@ export const HELDOUT_CASES: BenchCase[] = [
       check("b-alt", "img_alt_ratio", 2, { minRatio: 0.9 }),
       check("b-h1", "has_h1", 1),
     ],
-    truth: ["PASS"],
-    labels: { "b-http": true, "b-text": true, "b-js": true, "b-phone": true, "b-products": true, "b-alt": true, "b-h1": true },
-    why: "A working catalogue: 20 books with covers (all with alt text), prices and stock.",
+    truth: ["FAIL"],
+    // Corrected after review (see internal/benchmark/heldout-freeze.md): first labelled b-products
+    // true and PASS, missing the page's own warning, the same way as the Web Scraper shop.
+    labels: { "b-http": true, "b-text": true, "b-js": true, "b-phone": true, "b-products": false, "b-alt": true, "b-h1": true },
+    why: "A polished catalogue (20 books with covers, prices and stock), but it warns: “This is a demo website for web scraping purposes. Prices and ratings here were randomly assigned and have no real meaning.” Not a shop a client could sell from.",
   },
   {
     set: "heldout",
@@ -506,4 +510,4 @@ export const HELDOUT_CASES: BenchCase[] = [
   },
 ];
 
-export const CASES: BenchCase[] = [...DEV_CASES, ...HELDOUT_CASES];
+export const CASES: BenchCase[] = [...DEV_CASES, ...HELDOUT_CASES, ...CODE_CASES];

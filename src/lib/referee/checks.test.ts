@@ -179,6 +179,17 @@ describe("measured checks on the demo sites", () => {
     expect((await check("<section>A</section><section>B</section><section></section>")).status).toBe("fail");
   });
 
+  it("reads the README from the code archive, without GitHub's API", async () => {
+    const snap = (readme: string | null) => async () => ({
+      ok: true as const, owner: "o", repo: "r", sha: "a".repeat(40), branch: "default branch", skipped: 0,
+      files: [{ path: "index.html", text: "<h1>Hi</h1>", lines: 1 }, ...(readme === null ? [] : [{ path: "README.md", text: readme, lines: 1 }])],
+    });
+    const repo = async () => { throw new Error("the API must not be called for the README"); };
+    expect(await runCheck("repo_readme", {}, ctxFor("good", { repo, snapshot: snap("word ".repeat(80)) }))).toMatchObject({ status: "pass", evidence: "README has 80 words." });
+    expect((await runCheck("repo_readme", {}, ctxFor("good", { repo, snapshot: snap(null) }))).evidence).toBe("o/r has no README.");
+    expect((await runCheck("repo_readme", {}, ctxFor("good", { repo, snapshot: async () => null }))).evidence).toBe("No GitHub repository was submitted.");
+  });
+
   it("requires HTTPS", async () => {
     const ctx = ctxFor("good");
     const insecure = { ...ctx, page: { ...ctx.page!, finalUrl: "http://vouch.example/" } };

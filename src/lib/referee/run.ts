@@ -8,6 +8,7 @@ import { readRepo, type RepoOutcome } from "./github";
 import { parsePage, type Page } from "./page";
 import { runPageSpeed, type PageSpeedOutcome } from "./pagespeed";
 import { getRenderer, type RenderedPage } from "./render";
+import type { SnapshotOutcome } from "./repo-snapshot";
 import { findSuspicious, type Finding } from "./suspicious";
 
 export interface MeasuredResult extends CheckOutcome {
@@ -57,6 +58,8 @@ export interface RunInput {
   fundedAt?: Date | null;
   /** Run PageSpeed even if no criterion needs it (to get a screenshot for visual judging). */
   wantScreenshot?: boolean;
+  /** The submitted repository's code, downloaded once and shared with the code judge. */
+  snapshot?: () => Promise<SnapshotOutcome | null>;
 }
 
 /**
@@ -146,6 +149,7 @@ export async function runReferee(input: RunInput): Promise<RefereeReport> {
     },
     pagespeed,
     repo,
+    snapshot: input.snapshot,
   };
 
   // Start the slow external call early so it overlaps with the page checks.

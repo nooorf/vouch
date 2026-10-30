@@ -8,7 +8,7 @@ import { LlmUnavailableError } from "@/lib/llm";
 import { evaluate, type CriterionResult, type Evaluation } from "@/lib/policy/policy";
 import { judgeCode, type CodeJudgeOutput, type CodeRef } from "./code-judge";
 import { judge, type JudgeOutput } from "./judge";
-import { fetchRepoSnapshot } from "./repo-snapshot";
+import { fetchRepoSnapshot, type SnapshotOutcome } from "./repo-snapshot";
 import { runReferee, type RefereeReport } from "./run";
 import { findCodeDirectives } from "./suspicious";
 
@@ -136,14 +136,18 @@ export async function assessDelivery(input: AssessInput): Promise<Assessment> {
   const allJudged = input.criteria.filter((c): c is JudgedCriterion => c.kind === "judged");
   const judgedCriteria = allJudged.filter((c) => c.source !== "code");
   const codeCriteria = allJudged.filter((c) => c.source === "code");
+  // The repository is downloaded at most once, for the README check and the code questions.
+  let snapshotPromise: Promise<SnapshotOutcome | null> | null = null;
+  const snapshot = () => (snapshotPromise ??= input.repoUrl ? fetchRepoSnapshot(input.repoUrl) : Promise.resolve(null));
   // Read the code alongside the page.
-  const codePromise = codeCriteria.length ? assessCode(codeCriteria, input.repoUrl ?? null, input.objection ?? null) : Promise.resolve(null);
+  const codePromise = codeCriteria.length ? assessCode(codeCriteria, snapshot, input.objection ?? null) : Promise.resolve(null);
   const report = await runReferee({
     url: input.url,
     repoUrl: input.repoUrl,
     criteria: input.criteria,
     fundedAt: input.fundedAt,
     wantScreenshot: judgedCriteria.some((c) => c.visual),
+    snapshot,
   });
 
   let judged: JudgeOutput | null = null;
@@ -192,12 +196,12 @@ export async function assessDelivery(input: AssessInput): Promise<Assessment> {
 /** Read the delivered repository at its latest commit, scan it for instructions to the grader, and judge the code questions. */
 async function assessCode(
   criteria: JudgedCriterion[],
-  repoUrl: string | null,
+  getSnapshot: () => Promise<SnapshotOutcome | null>,
   objection: AssessInput["objection"],
 ): Promise<CodeAssessment & { findings: ReturnType<typeof findCodeDirectives> }> {
   const none = { judged: null, repo: null, findings: [] };
-  if (!repoUrl) return { ...none, error: null, missingRepo: true };
-  const snap = await fetchRepoSnapshot(repoUrl);
+  const snap = await getSnapshot();
+  if (!snap) return { ...none, error: null, missingRepo: true };
   if (!snap.ok) return { ...none, error: snap.error, missingRepo: false };
   const repo = { owner: snap.owner, repo: snap.repo, sha: snap.sha, branch: snap.branch, files: snap.files.length, skipped: snap.skipped };
   const findings = findCodeDirectives(snap.files);

@@ -21,7 +21,8 @@
     "eval": "node --env-file-if-exists=.env.local --import tsx evals/run.ts",
     "demo:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-demo.ts",
     "referee": "node --env-file-if-exists=.env.local --import tsx scripts/referee.ts",
-    "test:browser": "vitest run --config vitest.browser.config.mts"
+    "test:browser": "vitest run --config vitest.browser.config.mts",
+    "eval:report": "node --env-file-if-exists=.env.local --import tsx evals/report.ts"
   },
   "dependencies": {
     "@google/genai": "2.32.0",

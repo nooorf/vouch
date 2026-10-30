@@ -34,14 +34,15 @@ describe("readTar", () => {
   it("reads files, long pax paths, and skips directories and global headers", () => {
     const longPath = `repo-abc/${"deep/".repeat(30)}file.ts`;
     const archive = tar([
-      { name: "pax_global_header", type: "g", data: "52 comment=abc\n" },
+      { name: "pax_global_header", type: "g", data: "52 comment=0010bbea06781f11797c71a3497e7e0c1beff702\n" },
       { name: "repo-abc/", type: "5" },
       { name: "repo-abc/index.html", data: "<h1>Hi</h1>" },
       { name: "ignored-short-name", pax: longPath, data: "export const x = 1;" },
     ]);
     const seen: Record<string, string> = {};
-    readTar(archive, (p, d) => (seen[p] = d.toString()));
+    const { comment } = readTar(archive, (p, d) => (seen[p] = d.toString()));
     expect(seen).toEqual({ "repo-abc/index.html": "<h1>Hi</h1>", [longPath]: "export const x = 1;" });
+    expect(comment).toBe("0010bbea06781f11797c71a3497e7e0c1beff702"); // the commit the archive came from
   });
 });
 

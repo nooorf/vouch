@@ -1,38 +1,42 @@
-# How well does the referee judge real websites?
+# How well does the referee judge real deliveries?
 
-Vouch releases money when a delivery meets its brief, so the referee has to be right on sites it has never seen. This report runs the referee, exactly as production runs it, on public websites with realistic briefs, and compares its answers with labels a person set by looking at each site.
+Vouch releases money when a delivery meets its brief, so the referee has to be right on work it has never seen. This report runs the referee, exactly as production runs it, on public websites and open-source repositories with realistic briefs, and compares its answers with labels a person set by looking at each site and reading each repository's code.
 
-Run 2026-10-30 17:35 UTC · commit `d81c1c1` · AI judge: gemini-3.5-flash-lite · browser: local Chrome
+Run 2026-10-30 19:30 UTC · commit `6d0421b` · AI judge: gemini-3.5-flash-lite · browser: local Chrome
 
 | Set | Sites | Verdicts right | Criteria right | Money released that shouldn't have been |
 | --- | --- | --- | --- | --- |
-| **Held-out** (labelled before the referee ever ran on them) | 18 | **18/18** | **85/85** | **0 cases** |
+| **Held-out websites** (labelled before the referee ever ran on them) | 18 | **18/18** | **85/85** | **0 cases** |
+| **Held-out repositories** (code questions, labelled from the source before the code judge ran) | 7 | **7/7** | **32/32** | **0 cases** |
 | Development (the sites we built against) | 12 | 12/12 | 59/59 | 0 cases |
 
-**What to read from this.** The held-out labels were frozen (and fingerprinted) before the referee saw those sites. Its first run (17/18 verdicts, 82/85 criteria) found two general bugs, which we fixed for every site, not for these cases: each fix is a rule about web pages in general, tested with made-up pages. Nothing in the referee refers to a benchmark site. The development set shows the approach works on the sites that shaped it.
+**What to read from this.** The held-out labels were frozen (and fingerprinted) before the referee saw those sites. Its first run (16/18 verdicts, 81/85 criteria, 1 wrong release) and repeat runs found three general weaknesses, which we fixed for every site, not for these cases: each fix is a rule about web pages or code in general, tested with made-up examples. Nothing in the referee refers to a benchmark site. The development set shows the approach works on the sites that shaped it.
 
 **The column that matters most for an escrow** is the last one: a referee that wrongly withholds money can be corrected by the client's approval or a dispute, but one that wrongly releases money can't.
 
-**What we don't claim.** This isn't a claim that the referee is right on every site. 30 sites is a small sample, and the limits below are real. What the design guarantees instead: every measured check shows its evidence, AI "yes" answers must quote the page, and anything the referee can't measure goes to a person instead of being guessed.
+**What we don't claim.** This isn't a claim that the referee is right on every site or repository. 37 deliveries is a small sample, and the limits below are real. What the design guarantees instead: every measured check shows its evidence, AI "yes" answers must quote the page or the code, and anything the referee can't measure goes to a person instead of being guessed.
 
 ## What the referee covers
 
 - **20 measured checks** in 4 groups (page 11, web app in a real browser 3, Lighthouse 3, GitHub repo 3), each a fixed rule with plain-English evidence.
 - **AI-judged criteria** for what rules can't measure (is the copy real, does the page show a feed of articles), answered from the page text or a phone screenshot. A "yes" must quote the page, and code checks the quote is really there.
-- **Safety rules** in code, not in the AI: a failed required check releases nothing whatever the AI says; content aimed at the AI grader (including text hidden by CSS) sends the delivery to a person; placeholder-only evidence turns a "yes" into a "no"; unreachable pages and unmeasurable checks become "a person decides", not "fail".
-- **Delivery kinds tested:** client-rendered app, server-rendered app, template, wrong delivery, dead link, static site, broken app, not mobile-friendly, insecure link, server error, slow page.
+- **AI-judged code questions** (does the form validate the email, is there a server-side password check) answered from the delivered GitHub repository, read at a pinned commit. A "yes" must cite file and lines, and code finds that code in the file; the card shows the real lines, linked on GitHub.
+- **Safety rules** in code, not in the AI: a failed required check releases nothing whatever the AI says; content aimed at the AI grader (including text hidden by CSS, and comments in the code) sends the delivery to a person; placeholder-only evidence turns a "yes" into a "no"; unreachable pages and unmeasurable checks become "a person decides", not "fail".
+- **Delivery kinds tested:** client-rendered app, server-rendered app, template, wrong delivery, dead link, static site, broken app, not mobile-friendly, insecure link, server error, slow page, repository.
 
-## Held-out set
+## Held-out websites
 
 ### What the first run caught
 
-2026-10-30 16:34 UTC, working tree on top of commit d81c1c1: 17/18 verdicts, 82/85 criteria, 0 cases of money released wrongly.
+2026-10-30 16:34 UTC, working tree on top of commit d81c1c1: 16/18 verdicts, 81/85 criteria, 1 cases of money released wrongly.
 
 - **Quotes to Scrape**: expected PARTIAL, got NEEDS_HUMAN. *A referee bug.* The AI quoted the page correctly, but our quote checker stripped curly quote marks from the AI's quote and not from the page, so the quote “wasn't found” and the case went to a person. The safe direction: nothing was released wrongly. Fixed after the run: quote marks, apostrophes and dashes are normalized on both sides, with unit tests.
+- **Books to Scrape**: expected FAIL, got PASS: *money released that shouldn't have been.* The page warns that it's “a demo website for web scraping purposes” with randomly assigned prices; the judge looked at the books and prices and said yes. (Our own first label made the same mistake; see below.) Fixed after repeat runs showed the same weakness on the Web Scraper shop: the judge now treats a statement that undercuts the question as counting against it.
 - **HTML5 UP “Forty” template**: verdict right (FAIL), 3 criteria wrong. Our single page fetch timed out (10 s) from our network, though the page loaded in 5 s while we labelled it, so “loads in under 5 seconds” failed and the rest couldn't be checked. Fixed after the run: a timeout gets one more try before it counts.
 
 ### Where the referee caught what our labeller missed
 
+- **Books to Scrape**: once the judge read pages as a client would, it said no, quoting the page's warning that it's a demo with randomly assigned prices. Our label had missed that warning too. Corrected the same way, with a new fingerprint.
 - **Web Scraper test shop**: looks like a working shop, with laptops and phones and their prices, and we labelled it as meeting a brief for a site that sells products. The referee said no, quoting the page: “Items listed here are not for sale.” It was right: a client who asked for a shop wouldn't accept one that says its items aren't for sale. We corrected our label (recorded, with a new fingerprint); no referee code changed.
 
 ### Latest run
@@ -43,7 +47,7 @@ Run 2026-10-30 17:35 UTC · commit `d81c1c1` · AI judge: gemini-3.5-flash-lite 
 | --- | --- | --- | --- | --- |
 | Quotes to Scrape (JavaScript-rendered) | client-rendered app | PARTIAL | PARTIAL ✓ | 7/7 |
 | A bookshop submitted for the quotes-site brief | wrong delivery | FAIL | FAIL ✓ | 4/4 |
-| Books to Scrape (server-rendered catalogue) | server-rendered app | PASS | PASS ✓ | 7/7 |
+| Books to Scrape (says it's a demo with random prices) | server-rendered app | FAIL | FAIL ✓ | 7/7 |
 | Web Scraper test shop (says its items are not for sale) | server-rendered app | FAIL | FAIL ✓ | 6/6 |
 | Swag Labs login (React) | client-rendered app | PASS | PASS ✓ | 6/6 |
 | Bootstrap checkout example | static site | PASS | PASS ✓ | 5/5 |
@@ -61,6 +65,26 @@ Run 2026-10-30 17:35 UTC · commit `d81c1c1` · AI judge: gemini-3.5-flash-lite 
 | A page that takes 8 seconds to answer | slow page | FAIL | FAIL ✓ | 2/2 |
 
 No held-out misses on this run.
+
+## Held-out repositories
+
+Questions answered from the delivered code, on public open-source projects, with labels set by reading the source (each label names the file that decides it in `evals/benchmark/code-cases.ts`).
+
+**7/7 verdicts** (100%) · **32/32 criteria** (100%)
+
+| Delivery | Kind | Correct verdict | Referee | Criteria right |
+| --- | --- | --- | --- | --- |
+| RealWorld Conduit, Vue 3 (code) | repository | PARTIAL | PARTIAL ✓ | 5/5 |
+| RealWorld Conduit, SvelteKit (code) | repository | PARTIAL | PARTIAL ✓ | 4/4 |
+| Start Bootstrap Freelancer template (code) | repository | FAIL | FAIL ✓ | 4/4 |
+| Swag Labs demo shop (code) | repository | PARTIAL | PARTIAL ✓ | 5/5 |
+| Svelte Hacker News, Sapper version (code) | repository | PARTIAL | PARTIAL ✓ | 4/4 |
+| The Freelancer template's repo submitted for the shop's brief (code) | wrong delivery | FAIL | FAIL ✓ | 5/5 |
+| Code questions with no repository link | repository | FAIL | FAIL ✓ | 5/5 |
+
+Read at: `StartBootstrap/startbootstrap-freelancer@5bc65b4`, `mutoe/vue3-realworld-example-app@741c215`, `saucelabs/sample-app-web@ad62bb2`, `sveltejs/hn.svelte.dev@0010bbe`, `sveltejs/realworld@df79670`.
+
+No misses on this run.
 
 ## Development results
 
@@ -83,15 +107,22 @@ No held-out misses on this run.
 
 No development misses on this run.
 
-## By kind of delivery (both sets)
+## What repeat runs showed
+
+- **Disclaimers were read inconsistently.** On one run the Web Scraper shop (which says “Items listed here are not for sale”) came out PASS, the costly direction: the page lists different products on each visit, and the judge sometimes read only the products. Books to Scrape (“a demo website… prices randomly assigned”) had the same weakness from the first run. Fix: the judge now reads the page as the client would, and a statement that undercuts the question (“not for sale”, “demo only”, “coming soon”, “sample data”) counts against it. Three fresh repeats of the Web Scraper case all came out FAIL, Books to Scrape now does too, and the page-judge eval still passes.
+- **Code answers depended on which files the judge saw.** In a 121-file repository, big low-signal files (a stylesheet whose class names mention “comment”, a generated API client, docs, test fixtures) used up the budget, and the small files that decide the answers were left out; the judge then cited docs or tests, and some quotes didn't verify (those cases went to a person). Fix: standard search-engine ranking (BM25: rare words count more, repeats count less), whole-word matching, implementation code before tests and styles unless the question is about them, each question's own best files first, and a short list of general web vocabulary (“saved in the browser” finds localStorage).
+- **Outside services fail.** GitHub's API limit (60 an hour without a token), DNS failures on our network, a busy free-tier AI and Google's Lighthouse service each spoiled a run. The referee handled them safely (“a person decides”), and the code snapshot no longer uses GitHub's API at all, but they say nothing about judging, so the benchmark retries them with growing waits.
+
+## By kind of delivery (all sets)
 
 | Kind | Verdicts right | Criteria right |
 | --- | --- | --- |
 | client-rendered app | 8/8 | 47/47 |
+| repository | 6/6 | 27/27 |
 | server-rendered app | 5/5 | 29/29 |
 | static site | 5/5 | 25/25 |
 | template | 3/3 | 16/16 |
-| wrong delivery | 2/2 | 9/9 |
+| wrong delivery | 3/3 | 14/14 |
 | broken app | 2/2 | 7/7 |
 | dead link | 1/1 | 1/1 |
 | not mobile-friendly | 1/1 | 4/4 |
@@ -99,11 +130,12 @@ No development misses on this run.
 | server error | 1/1 | 1/1 |
 | slow page | 1/1 | 2/2 |
 
-## By check (labelled criteria, both sets)
+## By check (labelled criteria, all sets)
 
 | Check | Right |
 | --- | --- |
-| Site loads over HTTPS | 30/30 |
+| Site loads over HTTPS | 37/37 |
+| AI judge (code) | 25/25 |
 | AI judge (page text) | 21/21 |
 | Required phrases | 16/16 |
 | Has a main heading | 14/14 |
@@ -123,9 +155,9 @@ No development misses on this run.
 
 | | Cases |
 | --- | --- |
-| FAIL → FAIL | 16 |
-| PARTIAL → PARTIAL | 1 |
-| PASS → PASS | 7 |
+| FAIL → FAIL | 20 |
+| PARTIAL → PARTIAL | 5 |
+| PASS → PASS | 6 |
 | PASS/PARTIAL → PASS | 6 |
 
 ## How this was measured
@@ -142,6 +174,7 @@ No development misses on this run.
 - **No clicking through flows.** It loads pages; it doesn't log in, submit forms or complete a checkout.
 - **What "visible" means.** Text a browser draws counts as visible even if it's the same colour as the background; content behind JavaScript accordions or tabs isn't read (native <details> sections are opened).
 - **Loading has a limit.** A page gets 20 s to load and 10 s more for its data; slower apps are judged on what they show by then.
+- **Code is read, not run.** Code questions are answered by reading the repository's default branch at its latest commit; the referee doesn't build the project or run its tests. Large repositories are read selectively (about 30k tokens, the files most relevant to the questions), and the card says so.
 - **Phone fit is one phone.** 390 px wide, an iPhone-sized screen.
-- **The AI judge can be wrong,** which is why its "yes" must quote the page, low confidence goes to a person, and either side can dispute a result once.
-- **Small sample.** 30 sites. Enough to show the approach and catch real bugs, not enough for precise accuracy numbers.
+- **The AI judge can be wrong, and isn't perfectly repeatable** (borderline pages can flip between runs), which is why its "yes" must quote the page or the code, low confidence goes to a person, and either side can dispute a result once.
+- **Small sample.** 37 deliveries. Enough to show the approach and catch real bugs, not enough for precise accuracy numbers.

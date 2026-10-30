@@ -1,5 +1,6 @@
 import type { CheckId } from "@/lib/brief/checks";
 import type { RepoOutcome } from "./github";
+import type { SnapshotOutcome } from "./repo-snapshot";
 import { fold, type Page } from "./page";
 import { findPlaceholders } from "./placeholder";
 import type { PageSpeedOutcome } from "./pagespeed";
@@ -24,6 +25,8 @@ export interface CheckContext {
   fetchUrl: (url: string, method?: "GET" | "HEAD") => Promise<{ status: number; body: string }>;
   pagespeed: () => Promise<PageSpeedOutcome>;
   repo: () => Promise<RepoOutcome | null>;
+  /** The submitted repository's code at its latest commit (no GitHub API needed); null without a repo link. */
+  snapshot?: () => Promise<SnapshotOutcome | null>;
   /** Allow plain http (local development only). */
   allowHttp?: boolean;
   /** The page couldn't be reached for network reasons (possibly ours): checks report "error", not "fail". */
@@ -302,7 +305,20 @@ async function lighthouse(ctx: CheckContext, category: "accessibility" | "perfor
 
 /* ---------------- GitHub ---------------- */
 
+/** README words, read from the code archive: no API call, so no rate limit. */
+async function readmeCheck(ctx: CheckContext): Promise<CheckOutcome> {
+  const snap = await ctx.snapshot!();
+  if (!snap) return fail("No GitHub repository was submitted.");
+  if (!snap.ok) return error(snap.error);
+  const readme = snap.files.find((f) => /^readme(\.[a-z]+)?$/i.test(f.path));
+  const name = `${snap.owner}/${snap.repo}`;
+  if (!readme) return fail(`${name} has no README.`);
+  const words = readme.text.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length;
+  return words >= 50 ? pass(`README has ${words} words.`, { words }) : fail(`README has only ${words} words (needs 50).`, { words });
+}
+
 async function repoCheck(ctx: CheckContext, id: "repo_readme" | "repo_fresh_commits" | "ci_passing"): Promise<CheckOutcome> {
+  if (id === "repo_readme" && ctx.snapshot) return readmeCheck(ctx);
   const r = await ctx.repo();
   if (!r) return fail("No GitHub repository was submitted.");
   if (!r.ok) return error(r.error);

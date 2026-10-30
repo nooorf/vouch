@@ -1,14 +1,15 @@
 import { gunzipSync } from "node:zlib";
-import { env } from "@/lib/env";
 import { parseRepoUrl } from "./github";
 
 /**
  * A delivered GitHub repository, read at one pinned commit, so evidence like "src/form.js lines
  * 12-18" always points at the code that was judged, even after later pushes.
  *
- * One API call finds the commit; the code comes as a single archive from GitHub's download host
- * (not counted against the API rate limit) and is unpacked in memory. Only text source files are
- * kept: dependencies, build output, lockfiles, binaries and huge files are skipped.
+ * No API calls: the code comes as a single archive of the default branch from GitHub's download
+ * host, which isn't subject to the API's rate limit (60 requests an hour without a token). git
+ * writes the exact commit ID into the archive, which is how the snapshot is pinned. The archive is
+ * unpacked in memory; only text source files are kept (dependencies, build output, lockfiles,
+ * binaries and huge files are skipped).
  */
 
 export interface RepoFile {
@@ -22,6 +23,7 @@ export interface RepoSnapshot {
   repo: string;
   /** Full commit SHA the files come from. */
   sha: string;
+  /** Always the repository's default branch (what GitHub serves as HEAD). */
   branch: string;
   files: RepoFile[];
   /** Files left out (dependencies, binaries, too big…), for the report. */
@@ -71,7 +73,8 @@ function paxPath(body: Buffer): string | null {
  * Regular files in a tar archive (ustar, with pax and GNU long names, as GitHub produces).
  * Calls `onFile` with the path and contents; returns nothing else.
  */
-export function readTar(tar: Buffer, onFile: (path: string, data: Buffer) => void): void {
+export function readTar(tar: Buffer, onFile: (path: string, data: Buffer) => void): { comment: string | null } {
+  let comment: string | null = null;
   let offset = 0;
   let longName: string | null = null;
   while (offset + 512 <= tar.length) {
@@ -90,20 +93,25 @@ export function readTar(tar: Buffer, onFile: (path: string, data: Buffer) => voi
       longName = readString(body, 0, body.length);
       continue;
     }
-    if (type === "g") continue; // global header (GitHub puts the commit SHA here)
+    if (type === "g") {
+      // git archive's global header: "comment=<commit sha>".
+      comment = /(?:^|\n)\d+ comment=([0-9a-f]{40})\n/.exec(body.toString("utf8"))?.[1] ?? comment;
+      continue;
+    }
     const prefix = readString(header, 345, 155);
     const name = longName ?? (prefix ? `${prefix}/${readString(header, 0, 100)}` : readString(header, 0, 100));
     longName = null;
     if (type === "0" || type === "\0") onFile(name, body);
   }
+  return { comment };
 }
 
 /** Unpack a GitHub archive: drop its top-level "<repo>-<sha>/" folder, keep text source files. */
-export function unpackRepoArchive(gz: Buffer): { files: RepoFile[]; skipped: number } {
+export function unpackRepoArchive(gz: Buffer): { files: RepoFile[]; skipped: number; sha: string | null } {
   const tar = gunzipSync(gz);
   const files: RepoFile[] = [];
   let skipped = 0;
-  readTar(tar, (rawPath, data) => {
+  const { comment } = readTar(tar, (rawPath, data) => {
     const path = rawPath.split("/").slice(1).join("/");
     if (!path) return;
     if (!isSourcePath(path) || data.length > MAX_FILE_BYTES || files.length >= MAX_FILES || data.subarray(0, 8000).includes(0)) {
@@ -114,36 +122,19 @@ export function unpackRepoArchive(gz: Buffer): { files: RepoFile[]; skipped: num
     files.push({ path, text, lines: text.split("\n").length });
   });
   files.sort((a, b) => a.path.localeCompare(b.path));
-  return { files, skipped };
+  return { files, skipped, sha: comment };
 }
 
 /* ---------------- download ---------------- */
 
-async function gh<T>(path: string): Promise<{ status: number; body: T | null }> {
-  const token = env().GITHUB_TOKEN;
-  const res = await fetch(`https://api.github.com${path}`, {
-    headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "VouchReferee", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    signal: AbortSignal.timeout(10_000),
-  });
-  return { status: res.status, body: res.ok ? ((await res.json()) as T) : null };
-}
-
-/** Read the default branch of a public GitHub repo at its latest commit. */
+/** Read a public GitHub repository's default branch at its latest commit. */
 export async function fetchRepoSnapshot(repoUrl: string): Promise<SnapshotOutcome> {
   const parsed = parseRepoUrl(repoUrl);
   if (!parsed) return { ok: false, error: "That isn't a github.com repository link." };
   const { owner, repo } = parsed;
   try {
-    const meta = await gh<{ default_branch: string; private: boolean }>(`/repos/${owner}/${repo}`);
-    if (meta.status === 404) return { ok: false, error: "Repository not found or not public." };
-    if (!meta.body) return { ok: false, error: `GitHub returned HTTP ${meta.status}` };
-    if (meta.body.private) return { ok: false, error: "The repository is private." };
-    const branch = meta.body.default_branch;
-    const head = await gh<{ sha: string }>(`/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`);
-    if (!head.body?.sha) return { ok: false, error: `Couldn't read the latest commit on ${branch} (HTTP ${head.status}).` };
-    const sha = head.body.sha;
-
-    const res = await fetch(`https://codeload.github.com/${owner}/${repo}/tar.gz/${sha}`, { signal: AbortSignal.timeout(30_000), headers: { "user-agent": "VouchReferee" } });
+    const res = await fetch(`https://codeload.github.com/${owner}/${repo}/tar.gz/HEAD`, { signal: AbortSignal.timeout(30_000), headers: { "user-agent": "VouchReferee" } });
+    if (res.status === 404) return { ok: false, error: "Repository not found or not public." };
     if (!res.ok || !res.body) return { ok: false, error: `Couldn't download the code (HTTP ${res.status}).` };
     const chunks: Buffer[] = [];
     let total = 0;
@@ -152,9 +143,10 @@ export async function fetchRepoSnapshot(repoUrl: string): Promise<SnapshotOutcom
       if (total > MAX_ARCHIVE_BYTES) return { ok: false, error: `The repository is over ${MAX_ARCHIVE_BYTES / 1024 / 1024} MB compressed; too big to read.` };
       chunks.push(Buffer.from(chunk));
     }
-    const { files, skipped } = unpackRepoArchive(Buffer.concat(chunks));
+    const { files, skipped, sha } = unpackRepoArchive(Buffer.concat(chunks));
+    if (!sha) return { ok: false, error: "Couldn't tell which commit the code came from." };
     if (!files.length) return { ok: false, error: "The repository has no readable source files." };
-    return { ok: true, owner, repo, sha, branch, files, skipped };
+    return { ok: true, owner, repo, sha, branch: "default branch", files, skipped };
   } catch (err) {
     return { ok: false, error: `Reading the repository failed: ${err instanceof Error ? err.message : String(err)}` };
   }

@@ -92,7 +92,7 @@ describe("evaluate: guardrails", () => {
   it("an evidence quote not found on the page is treated as unverified", () => {
     const ev = evaluate({ ...base, results: [check("a", true, 5), judged("b", true, 0.95, 5, false, false)] });
     expect(ev.verdict).toBe("NEEDS_HUMAN");
-    expect(ev.reasons[0]).toMatch(/not found on the page/);
+    expect(ev.reasons[0]).toMatch(/not found in the delivery/);
   });
 
   it("a check that couldn't be measured goes to a human, never counts as a pass", () => {

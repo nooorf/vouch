@@ -164,7 +164,7 @@ export function evaluate(input: EvaluateInput): Evaluation {
     for (const r of uncertainJudged) {
       reasons.push(
         r.evidenceVerified === false
-          ? `AI evidence for "${r.label}" was not found on the page`
+          ? `AI evidence for "${r.label}" was not found in the delivery`
           : `AI confidence for "${r.label}" is below ${config.minConfidence}`,
       );
     }
