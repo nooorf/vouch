@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { sendToClient } from "@/app/actions/agreement";
 import { saveBrief } from "@/app/actions/jobs";
 import { Badge, Button, Card } from "@/components/ui";
 import { CHECKS, CHECK_IDS, DEFAULT_PARAMS, type CheckId, type ParamField } from "@/lib/brief/checks";
@@ -309,12 +310,14 @@ function MilestoneCard({
 /* Editor                                                               */
 /* ------------------------------------------------------------------ */
 
-export function BriefEditor({ jobId, initial, editable }: { jobId: string; initial: Brief; editable: boolean }) {
+export function BriefEditor({ jobId, initial, editable, versionNo }: { jobId: string; initial: Brief; editable: boolean; versionNo: number }) {
   const [brief, setBrief] = useState<Brief>(initial);
   const [saved, setSaved] = useState(() => JSON.stringify(initial));
   const [issues, setIssues] = useState<string[]>([]);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [confirmSend, setConfirmSend] = useState(false);
+  const [sending, startSending] = useTransition();
 
   const totalCents = brief.milestones.reduce((s, m) => s + m.amountCents, 0);
   const current = useMemo(() => ({ ...brief, totalCents }), [brief, totalCents]);
@@ -349,6 +352,17 @@ export function BriefEditor({ jobId, initial, editable }: { jobId: string; initi
         ],
       };
     });
+
+  function send() {
+    startSending(async () => {
+      const res = await sendToClient(jobId);
+      // On success the action redirects to the job page; we only get here on failure.
+      if (res && !res.ok) {
+        setIssues([res.error]);
+        setConfirmSend(false);
+      }
+    });
+  }
 
   function save() {
     startTransition(async () => {
@@ -460,6 +474,29 @@ export function BriefEditor({ jobId, initial, editable }: { jobId: string; initi
                 <p className="mt-2 text-center text-xs text-muted">
                   {dirty ? "Unsaved changes" : savedAt ? `Saved at ${savedAt}` : "Draft · only you can see it"}
                 </p>
+                <div className="mt-4 border-t border-line pt-4">
+                  {!confirmSend ? (
+                    <Button type="button" variant="secondary" className="w-full" disabled={dirty || pending} onClick={() => setConfirmSend(true)}>
+                      Send v{versionNo} to the client
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm">
+                        Send v{versionNo}? You accept it by sending, and it can only change again if the client asks for changes.
+                        {warnings > 0 && <span className="text-held"> It still has {warnings} suggestion{warnings > 1 ? "s" : ""}.</span>}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button type="button" className="flex-1" disabled={sending} onClick={send}>
+                          {sending ? "Sending…" : "Send now"}
+                        </Button>
+                        <Button type="button" variant="ghost" disabled={sending} onClick={() => setConfirmSend(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {dirty && <p className="mt-2 text-center text-xs text-muted">Save your changes before sending.</p>}
+                </div>
               </>
             ) : (
               <p className="mt-4 text-sm text-muted">This brief has been sent and can no longer be edited here.</p>

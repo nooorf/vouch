@@ -103,8 +103,15 @@ export const jobs = pgTable(
 
     clientName: text("client_name"),
     clientEmail: text("client_email"),
-    /** sha256 of the client's link token. The token itself is never stored. */
+    /** sha256 of the client's link token: how the client page finds the job. */
     clientTokenHash: text("client_token_hash").notNull().unique(),
+    /**
+     * The link token, AES-GCM encrypted with a key derived from AUTH_SECRET, so the owner can
+     * copy the link again. A database leak alone exposes no working links.
+     */
+    clientTokenEnc: text("client_token_enc"),
+    sentAt: ts("sent_at"),
+    agreedAt: ts("agreed_at"),
 
     agreedVersionId: uuid("agreed_version_id"),
     /** Seconds, so demo mode can use 30 s windows. */

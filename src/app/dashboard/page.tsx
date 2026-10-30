@@ -59,7 +59,7 @@ export default async function Dashboard() {
         <ul className="mt-8 grid gap-4 md:grid-cols-2">
           {jobs.map((job) => (
             <li key={job.id}>
-              <Link href={`/jobs/${job.id}/brief`} className="block rounded-xl focus-visible:outline-offset-4">
+              <Link href={`/jobs/${job.id}`} className="block rounded-xl focus-visible:outline-offset-4">
                 <Card className="p-5 transition-colors hover:border-brand/50">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="min-w-0 truncate font-semibold">{job.title}</h2>

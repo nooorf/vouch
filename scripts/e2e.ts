@@ -98,9 +98,69 @@ async function main() {
       await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent?.includes("title"), { timeout: 15_000 });
     });
 
+    const text = (t: string, timeout = 15_000) => page.waitForFunction((x) => document.body.innerText.includes(x), { timeout }, t);
+    const nav = (fn: () => Promise<void>) => Promise.all([page.waitForNavigation({ waitUntil: "networkidle0" }), fn()]);
+
+    await step("Send v1 to the client", async () => {
+      await page.reload({ waitUntil: "networkidle0" }); // drop the invalid edit
+      await clickByText(page, "button", "Send v1 to the client");
+      await nav(() => clickByText(page, "button", "Send now"));
+      if (!/\/jobs\/[0-9a-f-]+\?sent=1$/.test(page.url())) throw new Error(`Landed on ${page.url()}`);
+      await text("Sent v1 to the client");
+      const link = await page.$eval('input[aria-label="Client link"]', (el) => (el as HTMLInputElement).value);
+      if (!/\/c\/[A-Za-z0-9_-]{43}$/.test(link)) throw new Error(`Bad client link ${link}`);
+    });
+    await shot(page, "job-sent");
+
+    await step("Client view via the demo switcher", async () => {
+      await nav(() => clickByText(page, "a", "Client"));
+      if (!/\/c\/[A-Za-z0-9_-]{43}$/.test(page.url())) throw new Error(`Landed on ${page.url()}`);
+      await text("Accept this brief");
+    });
+    await shot(page, "client-review");
+
+    await step("Client requests changes", async () => {
+      await clickByText(page, "button", "Request changes");
+      await page.type("#note", "Please make the first milestone $210 and keep the total fair.");
+      await clickByText(page, "button", "Send request");
+      await text("Being revised");
+    });
+
+    await step("Freelancer sees the request and revises the amount", async () => {
+      await nav(() => clickByText(page, "a", "Freelancer"));
+      await text("Client asked for changes to v1");
+      await nav(() => clickByText(page, "a", "Revise the brief"));
+      await text("The client asked for changes to v1");
+      const amount = await page.waitForSelector('input[aria-label="Milestone amount"]');
+      await amount!.click({ count: 3 });
+      await amount!.type("210");
+      await clickByText(page, "button", "Save changes");
+      await text("Saved at");
+      await clickByText(page, "button", "Send v2 to the client");
+      await nav(() => clickByText(page, "button", "Send now"));
+      await text("Sent v2 to the client");
+    });
+
+    await step("Client sees what changed and accepts v2", async () => {
+      await nav(() => clickByText(page, "a", "Client"));
+      await text("What changed since v1");
+      await text("Amount:");
+      await clickByText(page, "button", "Accept this brief");
+      await text("You and Sam Rivera agreed on v2");
+    });
+    await shot(page, "client-agreed");
+
+    await step("Freelancer sees the agreed, locked brief", async () => {
+      await nav(() => clickByText(page, "a", "Freelancer"));
+      await text("Agreed on v2");
+      await text("Both sides agreed on the same version");
+      const res = await page.goto(page.url().replace(/\?.*$/, "") + "/brief", { waitUntil: "networkidle0" });
+      if (!res || !/\/jobs\/[0-9a-f-]+$/.test(page.url())) throw new Error(`Editor still reachable: ${page.url()}`);
+    });
+
     await step("Dashboard lists the job", async () => {
       await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle0" });
-      await page.waitForFunction(() => document.body.innerText.includes("$400"));
+      await text("agreed");
     });
 
     if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
