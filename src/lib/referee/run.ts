@@ -59,13 +59,18 @@ export interface RunInput {
   wantScreenshot?: boolean;
 }
 
-/** Network-level failures (DNS, resets) can be ours: try up to 3 times before giving up. */
+/**
+ * Network-level failures (DNS, resets) can be ours: try up to 3 times before giving up. A timeout
+ * gets one more try: one slow sample can be a blip, two in a row (20 s) is a slow page.
+ */
 async function fetchWithRetry(url: string, opts: FetchOptions) {
   for (let attempt = 1; ; attempt++) {
     try {
       return await safeFetch(url, opts);
     } catch (err) {
-      if (!(err instanceof FetchBlockedError) || err.kind !== "network" || attempt >= 3) throw err;
+      if (!(err instanceof FetchBlockedError)) throw err;
+      const tries = err.kind === "network" ? 3 : err.kind === "timeout" ? 2 : 1;
+      if (attempt >= tries) throw err;
       await new Promise((r) => setTimeout(r, attempt * 1500));
     }
   }

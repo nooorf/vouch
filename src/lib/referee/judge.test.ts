@@ -21,6 +21,15 @@ describe("quoteOnPage", () => {
     expect(quoteOnPage("Every bag is single origin and can be traced back to the farm.", page)).toBe(false);
   });
 
+  it("ignores typography the AI may not reproduce: curly quotes, apostrophes, dashes", () => {
+    const quotes = "“It is our choices, Harry, that show what we truly are.” by J.K. Rowling. We’re open 7–9 daily.";
+    // The page wraps the quote in curly quotes; the AI copies them, then adds the author after them.
+    expect(quoteOnPage("“It is our choices, Harry, that show what we truly are.” by J.K. Rowling", quotes)).toBe(true);
+    expect(quoteOnPage('"It is our choices, Harry, that show what we truly are." by J.K. Rowling', quotes)).toBe(true);
+    expect(quoteOnPage("We're open 7-9 daily", quotes)).toBe(true);
+    expect(quoteOnPage("We're open 7-10 daily", quotes)).toBe(false);
+  });
+
   it("rejects quotes too short to prove anything", () => {
     expect(quoteOnPage("coffee", page)).toBe(false);
     expect(quoteOnPage("", page)).toBe(false);
