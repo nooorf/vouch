@@ -1,36 +1,14 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
+import { CHECKS, CHECK_IDS } from "./checks";
 
-/**
- * The check library. The brief generator may only pick checks from here, which is what
- * keeps verdicts reproducible. `params` describes what the brief must supply.
- */
-export const CHECKS = {
-  http_ok: { label: "Site loads over HTTPS (status 200, under 5 s)", params: z.object({}) },
-  has_h1: { label: "Exactly one main heading (h1)", params: z.object({}) },
-  min_sections: { label: "Has at least N content sections", params: z.object({ min: z.number().int().min(1).max(20) }) },
-  viewport_meta: { label: "Mobile viewport meta tag present", params: z.object({}) },
-  responsive_css: { label: "Responsive CSS (media queries or fluid units)", params: z.object({}) },
-  img_alt_ratio: { label: "Images have alt text", params: z.object({ minRatio: z.number().min(0).max(1).default(0.9) }) },
-  has_form: { label: "Contact form with the named fields", params: z.object({ fields: z.array(z.string()).min(1).max(10) }) },
-  has_text: { label: "Page mentions the required phrases", params: z.object({ phrases: z.array(z.string()).min(1).max(10) }) },
-  links_ok: { label: "Internal links work (up to 10)", params: z.object({}) },
-  page_weight: { label: "HTML under a size limit", params: z.object({ maxKb: z.number().int().min(10).max(5000) }) },
-  // Google PageSpeed Insights (Lighthouse), measured by Google, not by us.
-  lighthouse_a11y: { label: "Lighthouse accessibility score (mobile)", params: z.object({ min: z.number().int().min(0).max(100).default(90) }) },
-  lighthouse_perf: { label: "Lighthouse performance score (mobile)", params: z.object({ min: z.number().int().min(0).max(100).default(70) }) },
-  lighthouse_seo: { label: "Lighthouse SEO score", params: z.object({ min: z.number().int().min(0).max(100).default(90) }) },
-  // GitHub
-  repo_readme: { label: "Repo has a README with substance", params: z.object({}) },
-  repo_fresh_commits: { label: "Repo has commits made after the job was funded", params: z.object({}) },
-  ci_passing: { label: "Latest CI run on the default branch passed", params: z.object({}) },
-} as const satisfies Record<string, { label: string; params: z.ZodType }>;
+/* Safe to import in the browser. Hashing lives in ./hash (Node only). */
 
-export type CheckId = keyof typeof CHECKS;
-const checkIds = Object.keys(CHECKS) as [CheckId, ...CheckId[]];
+export { CHECKS, type CheckId } from "./checks";
 
 /** suspicious_content always runs on every submission; it is not something a brief opts into. */
 export const ALWAYS_ON_CHECKS = ["http_ok", "suspicious_content"] as const;
+
+export const MAX_JOB_DAYS = 25;
 
 const weight = z.number().int().min(1).max(10);
 
@@ -38,7 +16,7 @@ export const CheckCriterion = z
   .object({
     kind: z.literal("check"),
     id: z.string().min(1),
-    checkId: z.enum(checkIds),
+    checkId: z.enum(CHECK_IDS),
     params: z.record(z.string(), z.unknown()).default({}),
     weight,
     required: z.boolean().default(false),
@@ -46,7 +24,7 @@ export const CheckCriterion = z
   .superRefine((c, ctx) => {
     const parsed = CHECKS[c.checkId].params.safeParse(c.params);
     if (!parsed.success) {
-      ctx.addIssue({ code: "custom", message: `Bad params for ${c.checkId}: ${parsed.error.message}` });
+      ctx.addIssue({ code: "custom", path: ["params"], message: `Settings for "${CHECKS[c.checkId].label}" are not valid` });
     }
   });
 
@@ -54,7 +32,7 @@ export const JudgedCriterion = z.object({
   kind: z.literal("judged"),
   id: z.string().min(1),
   /** A yes/no question a reviewer could answer from the page, e.g. "Does the hero copy name the roastery's single-origin beans?" */
-  rubric: z.string().min(15).max(300),
+  rubric: z.string().trim().min(15, "Write a full question (at least 15 characters)").max(300),
   weight,
   required: z.boolean().default(false),
   /** Judge from the rendered screenshot as well as the text. */
@@ -65,11 +43,11 @@ export const Criterion = z.discriminatedUnion("kind", [CheckCriterion, JudgedCri
 
 export const Milestone = z.object({
   id: z.string().min(1),
-  title: z.string().min(3).max(80),
+  title: z.string().trim().min(3, "Give the milestone a title").max(80),
   description: z.string().max(500).default(""),
-  amountCents: z.number().int().positive(),
-  dueInDays: z.number().int().min(1).max(25),
-  criteria: z.array(Criterion).min(1).max(10),
+  amountCents: z.number().int().positive("Each milestone needs an amount"),
+  dueInDays: z.number().int().min(1).max(MAX_JOB_DAYS, `Jobs must finish within ${MAX_JOB_DAYS} days`),
+  criteria: z.array(Criterion).min(1, "Add at least one criterion").max(10),
 });
 
 export const Terms = z.object({
@@ -79,7 +57,7 @@ export const Terms = z.object({
 
 export const Brief = z
   .object({
-    title: z.string().min(3).max(100),
+    title: z.string().trim().min(3).max(100),
     summary: z.string().max(1000),
     currency: z.literal("USD"),
     totalCents: z.number().int().positive(),
@@ -89,31 +67,19 @@ export const Brief = z
   .superRefine((b, ctx) => {
     const sum = b.milestones.reduce((s, m) => s + m.amountCents, 0);
     if (sum !== b.totalCents) {
-      ctx.addIssue({ code: "custom", message: `Milestones add up to ${sum}, total says ${b.totalCents}` });
+      ctx.addIssue({ code: "custom", path: ["totalCents"], message: `Milestones add up to ${sum / 100}, but the total is ${b.totalCents / 100}` });
     }
-    const maxDue = Math.max(...b.milestones.map((m) => m.dueInDays));
-    if (maxDue > 25) {
-      ctx.addIssue({ code: "custom", message: "Jobs must finish within 25 days (PayPal authorization lifetime)" });
+    const ids = new Set<string>();
+    for (const m of b.milestones) {
+      for (const c of m.criteria) {
+        if (ids.has(c.id)) ctx.addIssue({ code: "custom", message: `Duplicate criterion id ${c.id}` });
+        ids.add(c.id);
+      }
     }
   });
 
 export type Brief = z.infer<typeof Brief>;
 export type Milestone = z.infer<typeof Milestone>;
 export type Criterion = z.infer<typeof Criterion>;
-
-/** Stable JSON (sorted keys) so both parties sign the exact same bytes. */
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-/** The hash both parties accept. A brief is AGREED when both accepted the same hash. */
-export function briefHash(brief: Brief): string {
-  return createHash("sha256").update(canonical(Brief.parse(brief))).digest("hex");
-}
+export type CheckCriterion = z.infer<typeof CheckCriterion>;
+export type JudgedCriterion = z.infer<typeof JudgedCriterion>;

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { desc, eq } from "drizzle-orm";
+import Link from "next/link";
 import { MoneyBar } from "@/components/money-bar";
-import { Badge, Card, Container } from "@/components/ui";
+import { Badge, Card, Container, LinkButton } from "@/components/ui";
 import { db, schema } from "@/db";
 import { formatCents } from "@/lib/money";
 import { requireUser } from "@/lib/session";
@@ -34,6 +35,7 @@ export default async function Dashboard() {
           <p className="text-sm text-muted">Freelancer workspace</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Your jobs</h1>
         </div>
+        <LinkButton href="/jobs/new">New job</LinkButton>
       </div>
 
       {user.demo && (
@@ -47,23 +49,28 @@ export default async function Dashboard() {
         <Card className="mt-8 flex flex-col items-center px-6 py-16 text-center">
           <h2 className="font-semibold">No jobs yet</h2>
           <p className="mt-2 max-w-sm text-sm text-muted">
-            Jobs you create appear here with their milestones and how much money is held or released.
+            Describe a job in plain words and AI drafts a brief with milestones and checkable criteria.
           </p>
+          <LinkButton href="/jobs/new" className="mt-6">
+            Create your first job
+          </LinkButton>
         </Card>
       ) : (
         <ul className="mt-8 grid gap-4 md:grid-cols-2">
           {jobs.map((job) => (
             <li key={job.id}>
-              <Card className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="min-w-0 truncate font-semibold">{job.title}</h2>
-                  <Badge tone={statusTone[job.status]}>{job.status.replace("_", " ").toLowerCase()}</Badge>
-                </div>
-                <p className="tabular mt-1 font-mono text-sm text-muted">{formatCents(job.totalCents)}</p>
-                <div className="mt-4">
-                  <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} />
-                </div>
-              </Card>
+              <Link href={`/jobs/${job.id}/brief`} className="block rounded-xl focus-visible:outline-offset-4">
+                <Card className="p-5 transition-colors hover:border-brand/50">
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="min-w-0 truncate font-semibold">{job.title}</h2>
+                    <Badge tone={statusTone[job.status]}>{job.status.replace("_", " ").toLowerCase()}</Badge>
+                  </div>
+                  <p className="tabular mt-1 font-mono text-sm text-muted">{formatCents(job.totalCents)}</p>
+                  <div className="mt-4">
+                    <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} />
+                  </div>
+                </Card>
+              </Link>
             </li>
           ))}
         </ul>

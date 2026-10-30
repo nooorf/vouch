@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { demoBrief } from "./demo";
-import { Brief, briefHash } from "./schema";
+import { briefHash } from "./hash";
+import { Brief } from "./schema";
 
 describe("Brief schema", () => {
   it("accepts the demo brief", () => {
