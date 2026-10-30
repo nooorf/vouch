@@ -5,17 +5,40 @@
  * Uses your installed Chrome (CHROME_PATH to override). Screenshots go to E2E_SHOTS if set.
  */
 import { existsSync, mkdirSync } from "node:fs";
+import { CheckoutPaymentIntent } from "@paypal/paypal-server-sdk";
+import { eq } from "drizzle-orm";
 import puppeteer, { type Page } from "puppeteer-core";
+import { closeDb, db, schema } from "../src/db";
+import { findJobByClientToken } from "../src/lib/jobs/agreement";
+import { paypal, usd } from "../src/lib/paypal/client";
+import { completeFunding } from "../src/lib/paypal/funding";
 
 const BASE = (process.env.E2E_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const CHROME = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const SHOTS = process.env.E2E_SHOTS;
+/**
+ * How the walk-through funds the job:
+ * - "card" (default): a sandbox test card authorized server-side, then Vouch's real completeFunding().
+ *   No buyer login, so repeated runs don't trip PayPal's bot protection.
+ * - "popup": log in to PayPal's checkout popup as the demo buyer, like a person would.
+ * - "auto": try the popup, fall back to the card if PayPal refuses the automated login.
+ */
+const PAYPAL_MODE = (process.env.E2E_PAYPAL ?? "card") as "card" | "popup" | "auto";
 
 let failures = 0;
+const STEP_LIMIT_MS = 5 * 60_000;
+
 async function step(name: string, fn: () => Promise<void>) {
   const started = Date.now();
   try {
-    await fn();
+    // A hung step fails instead of hanging the whole run.
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      fn(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Step took longer than ${STEP_LIMIT_MS / 60_000} minutes`)), STEP_LIMIT_MS);
+      }),
+    ]).finally(() => clearTimeout(timer));
     console.log(`  ✔ ${name} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
   } catch (err) {
     failures++;
@@ -44,41 +67,81 @@ async function shot(page: Page, name: string) {
  * Drive PayPal's sandbox checkout popup: email, password, then approve. PayPal navigates between
  * these screens on its own, so poll for whichever screen is showing instead of a fixed script.
  */
-async function approveInPayPalPopup(popup: Page, email: string, password: string) {
-  const submit = '#payment-submit-btn, button[data-testid="submit-button-initial"], button[data-id="payment-submit-btn"]';
-  const visible = async (sel: string) => {
-    const el = await popup.$(sel);
-    return el ? el.isVisible() : false;
+async function approveInPayPalPopup(popup: Page, email: string, password: string, budgetMs = 150_000) {
+  // PayPal's pages can contain hidden duplicates of a field (e.g. two #email inputs), so always
+  // act on the first *visible* match.
+  const visibleOne = async (selectors: string) => {
+    for (const el of await popup.$$(selectors)) if (await el.isVisible()) return el;
+    return null;
   };
-  const done = { email: false, password: false };
-  const deadline = Date.now() + 150_000;
+  const SUBMIT = '#payment-submit-btn, button[data-testid="submit-button-initial"], button[data-id="payment-submit-btn"]';
+  const EMAIL = '#email, input[name="login_email"], input[type="email"]';
+  const PASSWORD = '#password, input[name="login_password"], input[type="password"]';
+  const NEXT = "#btnNext";
+  const LOGIN = "#btnLogin";
+
+  // Each step may need more than one try: PayPal re-renders its forms while scripts load.
+  const tries = { email: 0, password: 0 };
+  let lastAction = 0;
+  const settle = () => Date.now() - lastAction > 6000;
+  const deadline = Date.now() + budgetMs;
   while (Date.now() < deadline) {
     if (popup.isClosed()) return; // PayPal closes the popup after approval
     try {
-      if (await visible(submit)) {
-        await popup.click(submit);
-        await new Promise((r) => setTimeout(r, 2000));
-        continue;
-      }
-      if (!done.password && (await visible("#password"))) {
-        await popup.click("#password", { count: 3 });
-        await popup.type("#password", password);
-        await popup.click("#btnLogin");
-        done.password = true;
-      } else if (!done.email && (await visible("#email"))) {
-        await popup.click("#email", { count: 3 });
-        await popup.type("#email", email);
-        if (await visible("#btnNext")) await popup.click("#btnNext");
-        done.email = true;
+      const submit = await visibleOne(SUBMIT);
+      const pw = await visibleOne(PASSWORD);
+      const em = pw ? null : await visibleOne(EMAIL);
+      if (submit) {
+        await submit.click();
+        lastAction = Date.now();
+      } else if (pw && tries.password < 4 && (tries.password === 0 || settle())) {
+        const value = await pw.evaluate((el) => (el as HTMLInputElement).value);
+        if (!value) await pw.type(password);
+        const login = await visibleOne(LOGIN);
+        if (login && tries.password % 2 === 0) await login.click();
+        else await pw.press("Enter");
+        tries.password++;
+        lastAction = Date.now();
+      } else if (em && tries.email < 4 && (tries.email === 0 || settle())) {
+        await em.click({ count: 3 });
+        await em.type(email);
+        const next = await visibleOne(NEXT);
+        if (next) await next.click();
+        else await em.press("Enter");
+        tries.email++;
+        lastAction = Date.now();
       }
     } catch (err) {
       // "Execution context was destroyed" etc.: PayPal navigated mid-action. Look again.
       if (popup.isClosed()) return;
-      if (!/context|detached|navigat|Target closed/i.test(String(err))) throw err;
+      if (!/context|detached|navigat|Target closed|not clickable|Node is/i.test(String(err))) throw err;
     }
     await new Promise((r) => setTimeout(r, 1000));
   }
-  throw new Error("PayPal popup did not finish within 150 s");
+  if (SHOTS && !popup.isClosed()) {
+    if (!existsSync(SHOTS)) mkdirSync(SHOTS, { recursive: true });
+    await popup.screenshot({ path: `${SHOTS}/paypal-popup-stuck.png`, fullPage: true }).catch(() => undefined);
+    console.log(`    popup URL: ${popup.url()}`);
+  }
+  throw new Error(`PayPal popup did not finish within ${budgetMs / 1000} s`);
+}
+
+/** Fund the job behind a client link with a sandbox test card, through Vouch's real funding code. */
+async function fundWithTestCard(clientUrl: string) {
+  const token = new URL(clientUrl).pathname.split("/").pop()!;
+  const job = await findJobByClientToken(token);
+  if (!job) throw new Error("Job not found for client link");
+  const { result: order } = await paypal().orders.createOrder({
+    paypalRequestId: `e2e-card-${job.id}`,
+    body: {
+      intent: CheckoutPaymentIntent.Authorize,
+      purchaseUnits: [{ referenceId: job.id, customId: job.id, amount: usd(job.totalCents) }],
+      paymentSource: { card: { number: "4032039317984658", expiry: "2030-12", securityCode: "123", name: "Vouch E2E" } },
+    },
+  });
+  await db.update(schema.jobs).set({ paypalOrderId: order.id! }).where(eq(schema.jobs.id, job.id));
+  const result = await completeFunding(job.id, order.id!, "client");
+  if (result !== "funded") throw new Error(`completeFunding returned ${result}`);
 }
 
 async function main() {
@@ -224,21 +287,39 @@ async function main() {
     if (!buyerEmail || !buyerPassword) {
       console.log("  - Skipping PayPal funding: set DEMO_BUYER_EMAIL and DEMO_BUYER_PASSWORD in .env.local");
     } else {
-      await step("Client funds the job with the PayPal sandbox", async () => {
+      await step(`Client funds the job (${PAYPAL_MODE === "card" ? "sandbox test card" : "PayPal sandbox popup"})`, async () => {
         await text("Fund the job to start the work.");
-        const iframe = await page.waitForSelector('iframe[title*="PayPal"]', { timeout: 30_000 });
-        const frame = await iframe!.contentFrame();
-        const popupPromise = new Promise<Page>((resolve) =>
-          browser.once("targetcreated", async (t) => {
-            const p = await t.page();
-            if (p) resolve(p);
-          }),
-        );
-        await frame.waitForSelector('[data-funding-source="paypal"]', { visible: true, timeout: 30_000 });
-        await frame.click('[data-funding-source="paypal"]');
-        const popup = await popupPromise;
-        await approveInPayPalPopup(popup, buyerEmail, buyerPassword);
-        await text("is held by PayPal", 120_000);
+        let funded = false;
+        if (PAYPAL_MODE !== "card") {
+          try {
+            const iframe = await page.waitForSelector('iframe[title*="PayPal"]', { timeout: 30_000 });
+            const frame = await iframe!.contentFrame();
+            const popupPromise = new Promise<Page>((resolve, reject) => {
+              const timer = setTimeout(() => reject(new Error("PayPal's popup didn't open within 30 s")), 30_000);
+              browser.once("targetcreated", async (t) => {
+                const p = await t.page();
+                clearTimeout(timer);
+                if (p) resolve(p);
+                else reject(new Error("PayPal's popup opened without a page"));
+              });
+            });
+            await frame.waitForSelector('[data-funding-source="paypal"]', { visible: true, timeout: 30_000 });
+            await frame.click('[data-funding-source="paypal"]');
+            const popup = await popupPromise;
+            await approveInPayPalPopup(popup, buyerEmail, buyerPassword, PAYPAL_MODE === "auto" ? 60_000 : 150_000);
+            await text("is held by PayPal", 120_000);
+            funded = true;
+          } catch (err) {
+            if (PAYPAL_MODE === "popup") throw err;
+            console.log(`    PayPal refused the automated login (${err instanceof Error ? err.message : err}); using a sandbox test card instead`);
+            for (const p of await browser.pages()) if (p !== page) await p.close().catch(() => undefined);
+          }
+        }
+        if (!funded) {
+          await fundWithTestCard(page.url());
+          await page.reload({ waitUntil: "networkidle0" });
+          await text("is held by PayPal", 30_000);
+        }
       });
       await shot(page, "client-funded");
 
@@ -247,6 +328,26 @@ async function main() {
         await text("Funded");
         await text("Waiting for delivery");
         await text("authorized");
+      });
+
+      await step("Freelancer submits the good demo site for M1", async () => {
+        await clickByText(page, "button", "Good site");
+        await clickByText(page, "button", "Submit for checking");
+        await text("Checking the delivery");
+      });
+
+      await step("The referee checks it and shows a verdict with evidence", async () => {
+        await page.waitForFunction(() => /Passed|Partly met|Not met|Needs a person/.test(document.body.innerText) && !document.body.innerText.includes("Checking the delivery"), { timeout: 180_000 });
+        await text("One main heading");
+        await text("AI ·");
+      });
+      await shot(page, "evaluation-freelancer");
+
+      await step("The client sees the same evaluation", async () => {
+        await nav(() => clickByText(page, "a", "Client"));
+        await page.waitForFunction(() => /Passed|Partly met|Not met|Needs a person/.test(document.body.innerText), { timeout: 30_000 });
+        await text("M1 delivery");
+        await nav(() => clickByText(page, "a", "Freelancer"));
       });
     }
 
@@ -272,4 +373,5 @@ main()
   .catch(() => {
     console.log("\nE2E failed");
     process.exitCode = 1;
-  });
+  })
+  .finally(closeDb);

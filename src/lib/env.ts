@@ -41,6 +41,8 @@ const EnvSchema = z
     RESEND_API_KEY: opt(z.string().startsWith("re_", "RESEND_API_KEY starts with re_")),
     EMAIL_FROM: z.preprocess((v) => (v === "" ? undefined : v), z.string().default("onboarding@resend.dev")),
     CRON_SECRET: opt(z.string().min(16)),
+    /** Review window for demo jobs, so judges can watch the silence rule release money. */
+    DEMO_REVIEW_WINDOW_SECONDS: z.preprocess((v) => (v === "" || v === undefined ? undefined : Number(v)), z.number().int().min(10).max(86_400).default(120)),
     /** Local development only: let the referee fetch http://localhost (e.g. the demo sites). */
     REFEREE_ALLOW_LOCALHOST: flag,
   })
@@ -57,8 +59,9 @@ const EnvSchema = z
     if (e.PAYPAL_CLIENT_ID && e.NEXT_PUBLIC_PAYPAL_CLIENT_ID && e.PAYPAL_CLIENT_ID !== e.NEXT_PUBLIC_PAYPAL_CLIENT_ID) {
       ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_PAYPAL_CLIENT_ID"], message: "NEXT_PUBLIC_PAYPAL_CLIENT_ID must equal PAYPAL_CLIENT_ID" });
     }
-    if (e.NODE_ENV === "production" && e.REFEREE_ALLOW_LOCALHOST) {
-      ctx.addIssue({ code: "custom", path: ["REFEREE_ALLOW_LOCALHOST"], message: "REFEREE_ALLOW_LOCALHOST is for local development only" });
+    // Only on a machine whose own app URL is local: a deployed server (public APP_URL) refuses it.
+    if (e.REFEREE_ALLOW_LOCALHOST && !["localhost", "127.0.0.1"].includes(new URL(e.APP_URL).hostname)) {
+      ctx.addIssue({ code: "custom", path: ["REFEREE_ALLOW_LOCALHOST"], message: "REFEREE_ALLOW_LOCALHOST is for local development only (APP_URL must be localhost)" });
     }
     if (e.PAYPAL_ENV === "live") {
       ctx.addIssue({ code: "custom", path: ["PAYPAL_ENV"], message: "Vouch only runs against the PayPal sandbox" });

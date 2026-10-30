@@ -13,7 +13,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import type { Brief, Criterion } from "@/lib/brief/schema";
-import type { CriterionResult, Verdict } from "@/lib/policy/policy";
+import type { Verdict } from "@/lib/policy/policy";
+import type { RecordedResult } from "@/lib/referee/evaluate";
 
 /* Money is always integer cents. Times are timestamptz. */
 
@@ -234,11 +235,13 @@ export const evaluations = pgTable(
     id: id(),
     deliveryId: uuid("delivery_id").notNull().references(() => deliveries.id, { onDelete: "cascade" }),
     milestoneId: uuid("milestone_id").notNull().references(() => milestones.id, { onDelete: "cascade" }),
-    briefVersionId: uuid("brief_version_id").notNull().references(() => briefVersions.id),
+    briefVersionId: uuid("brief_version_id")
+      .notNull()
+      .references(() => briefVersions.id, { onDelete: "cascade" }),
     kind: evaluationKind("kind").notNull().default("initial"),
     status: evaluationStatus("status").notNull().default("queued"),
 
-    results: jsonb("results").$type<CriterionResult[]>(),
+    results: jsonb("results").$type<RecordedResult[]>(),
     measurements: jsonb("measurements").$type<Measurements>(),
     suspicious: boolean("suspicious").notNull().default(false),
     verdict: verdict("verdict").$type<Verdict>(),

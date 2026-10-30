@@ -23,6 +23,11 @@ export interface CriterionResult {
    */
   evidenceVerified?: boolean;
   evidence: string;
+  /**
+   * Measured checks only: the check couldn't be measured (e.g. Lighthouse unavailable).
+   * Counts as not passed, and sends the delivery to a person instead of deciding without it.
+   */
+  unmeasured?: boolean;
   /** Shown to the freelancer when this criterion fails. */
   fixHint?: string;
 }
@@ -107,7 +112,8 @@ export function evaluate(input: EvaluateInput): Evaluation {
   const checks = results.filter((r) => r.kind === "check");
   const passedCheckWeight = checks.filter((r) => r.passed).reduce((s, r) => s + r.weight, 0);
 
-  const requiredCheckFailed = checks.some((r) => r.required && !r.passed);
+  const unmeasured = checks.filter((r) => r.unmeasured);
+  const requiredCheckFailed = checks.some((r) => r.required && !r.passed && !r.unmeasured);
   const uncertainJudged = results.filter(
     (r) =>
       r.kind === "judged" &&
@@ -151,9 +157,10 @@ export function evaluate(input: EvaluateInput): Evaluation {
     return finish("NEEDS_HUMAN", 0, 0);
   }
 
-  // 3. The AI is unsure or quoted evidence that is not on the page: a human decides,
-  //    silence releases only what the measured checks back.
-  if (uncertainJudged.length > 0) {
+  // 3. A check couldn't be measured, or the AI is unsure or quoted evidence that is not on the
+  //    page: a human decides, and silence releases only what passing measured checks back.
+  if (uncertainJudged.length > 0 || unmeasured.length > 0) {
+    for (const r of unmeasured) reasons.push(`Couldn't measure "${r.label}"`);
     for (const r of uncertainJudged) {
       reasons.push(
         r.evidenceVerified === false

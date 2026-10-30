@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { after } from "next/server";
+import { and, desc, eq } from "drizzle-orm";
 import { Activity } from "@/components/activity";
 import { BriefView, VersionChanges } from "@/components/brief-view";
+import { EvaluationCard } from "@/components/evaluation-card";
 import { CopyLink, JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { MilestoneList } from "@/components/milestones";
 import { MoneyBar } from "@/components/money-bar";
@@ -12,10 +14,14 @@ import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
 import { clientUrlFor } from "@/lib/jobs/agreement";
 import { stepIndex } from "@/lib/jobs/status";
+import { canSubmit, currentMilestone } from "@/lib/jobs/delivery";
+import { drainTasks } from "@/lib/jobs/runner";
 import { tickJob } from "@/lib/jobs/tick";
+import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { formatCents } from "@/lib/money";
 import { requireUser } from "@/lib/session";
 import { ProposalActions } from "./proposal-actions";
+import { SubmitDelivery } from "./submit-delivery";
 
 export const metadata: Metadata = { title: "Job" };
 
@@ -27,22 +33,21 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   const user = await requireUser();
   if (!UUID.test(id)) notFound();
   await tickJob(id);
+  after(() => drainTasks({ jobId: id }).catch((e) => console.error("[job page] drain", e)));
 
-  const [job] = await db
-    .select()
-    .from(schema.jobs)
-    .where(and(eq(schema.jobs.id, id), eq(schema.jobs.ownerId, user.id)));
+  // Independent reads in parallel: each is a network round trip to the database.
+  const [[job], versions, rows, events] = await Promise.all([
+    db.select().from(schema.jobs).where(and(eq(schema.jobs.id, id), eq(schema.jobs.ownerId, user.id))),
+    db.select().from(schema.briefVersions).where(eq(schema.briefVersions.jobId, id)).orderBy(desc(schema.briefVersions.versionNo)),
+    milestonesWithEvaluations(id),
+    db.select().from(schema.events).where(eq(schema.events.jobId, id)).orderBy(desc(schema.events.id)).limit(50),
+  ]);
   if (!job) notFound();
-
-  const versions = await db
-    .select()
-    .from(schema.briefVersions)
-    .where(eq(schema.briefVersions.jobId, id))
-    .orderBy(desc(schema.briefVersions.versionNo));
   const latest = versions[0];
   const shown = (job.agreedVersionId && versions.find((v) => v.id === job.agreedVersionId)) || latest;
-  const milestones = await db.select().from(schema.milestones).where(eq(schema.milestones.jobId, id)).orderBy(asc(schema.milestones.position));
-  const events = await db.select().from(schema.events).where(eq(schema.events.jobId, id)).orderBy(desc(schema.events.id)).limit(50);
+  const milestones = rows.map((r) => r.m);
+  const current = currentMilestone(milestones);
+  const submittable = (job.status === "FUNDED" || job.status === "IN_PROGRESS") && current ? canSubmit(current, job.maxResubmissions) : null;
 
   const clientUrl = clientUrlFor(job);
   const clientPath = clientUrl ? new URL(clientUrl).pathname : null;
@@ -92,6 +97,22 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
           )}
           {clientProposal && beforeProposal && <VersionChanges changes={diffBriefs(beforeProposal.content, clientProposal.content)} fromVersion={beforeProposal.versionNo} />}
           <MilestoneList milestones={milestones} />
+          {current && submittable?.ok && (
+            <SubmitDelivery
+              jobId={job.id}
+              milestoneId={current.id}
+              position={current.position}
+              title={current.title}
+              wantsRepo={current.criteria.some((c) => c.kind === "check" && ["repo_readme", "repo_fresh_commits", "ci_passing"].includes(c.checkId))}
+              demo={user.demo}
+              resubmission={current.attempts > 0}
+            />
+          )}
+          {[...rows].reverse().map(({ m, ev, delivery }) =>
+            ev && delivery ? (
+              <EvaluationCard key={ev.id} m={m} ev={ev} delivery={delivery} viewer="freelancer" freelancer="you" maxAttempts={1 + job.maxResubmissions} />
+            ) : null,
+          )}
           <BriefView brief={shown.content} />
         </div>
 

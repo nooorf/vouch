@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { after } from "next/server";
+import { desc, eq, inArray } from "drizzle-orm";
 import { BriefView, VersionChanges } from "@/components/brief-view";
+import { EvaluationCard } from "@/components/evaluation-card";
 import { JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { MilestoneList } from "@/components/milestones";
 import { MoneyBar } from "@/components/money-bar";
@@ -10,7 +12,9 @@ import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
 import { env, hasFeature } from "@/lib/env";
 import { findJobByClientToken } from "@/lib/jobs/agreement";
+import { drainTasks } from "@/lib/jobs/runner";
 import { tickJob } from "@/lib/jobs/tick";
+import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { stepIndex } from "@/lib/jobs/status";
 import { formatCents } from "@/lib/money";
 import { getCurrentUser } from "@/lib/session";
@@ -26,16 +30,17 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
   if (!found) notFound();
   // Bring the job up to date first (e.g. a PayPal approval we haven't recorded yet).
   await tickJob(found.id);
-  const job = (await findJobByClientToken(token))!;
-  const milestones = await db.select().from(schema.milestones).where(eq(schema.milestones.jobId, job.id)).orderBy(asc(schema.milestones.position));
+  after(() => drainTasks({ jobId: found.id }).catch((e) => console.error("[client page] drain", e)));
+  // Independent reads in parallel: each is a network round trip to the database.
+  const [job, rows, [owner], versions, viewer] = await Promise.all([
+    findJobByClientToken(token).then((j) => j!),
+    milestonesWithEvaluations(found.id),
+    db.select().from(schema.users).where(eq(schema.users.id, found.ownerId)),
+    db.select().from(schema.briefVersions).where(eq(schema.briefVersions.jobId, found.id)).orderBy(desc(schema.briefVersions.versionNo)),
+    getCurrentUser(),
+  ]);
+  const milestones = rows.map((r) => r.m);
   const e = env();
-
-  const [owner] = await db.select().from(schema.users).where(eq(schema.users.id, job.ownerId));
-  const versions = await db
-    .select()
-    .from(schema.briefVersions)
-    .where(eq(schema.briefVersions.jobId, job.id))
-    .orderBy(desc(schema.briefVersions.versionNo));
 
   // Only versions someone put forward (sent by the freelancer or proposed by the client) are visible.
   // The freelancer's unsent drafts never are.
@@ -53,7 +58,6 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
   const previous = sent.find((v) => v.versionNo < shown.versionNo);
   const pendingRequest = job.status === "DRAFT" ? versions[0]?.changeRequest : null;
 
-  const viewer = await getCurrentUser();
   const isDemoOwner = viewer?.demo && viewer.id === job.ownerId;
 
   return (
@@ -79,6 +83,11 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
           <MilestoneList milestones={milestones} />
+          {[...rows].reverse().map(({ m, ev, delivery }) =>
+            ev && delivery ? (
+              <EvaluationCard key={ev.id} m={m} ev={ev} delivery={delivery} viewer="client" freelancer={owner?.name ?? "the freelancer"} maxAttempts={1 + job.maxResubmissions} />
+            ) : null,
+          )}
           {previous && job.status === "PROPOSED" && <VersionChanges changes={diffBriefs(previous.content, shown.content)} fromVersion={previous.versionNo} />}
           <BriefView brief={shown.content} />
         </div>

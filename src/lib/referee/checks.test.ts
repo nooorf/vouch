@@ -72,6 +72,16 @@ describe("measured checks on the demo sites", () => {
     expect((await runCheck("responsive_css", {}, ctx)).evidence).toMatch(/media queries in site\.css/);
   });
 
+  it("recognises fluid layouts without media queries, and rejects fixed widths", async () => {
+    const page = (css: string) =>
+      parsePage({ url: ORIGIN, finalUrl: ORIGIN, status: 200, ms: 1, bytes: 1, truncated: false, html: `<html><head><style>${css}</style></head><body><p>x</p></body></html>` });
+    const base = ctxFor("good");
+    const capped = await runCheck("responsive_css", {}, { ...base, page: page("body{max-width:26em;margin:auto;padding:25vh 2em}") });
+    expect(capped).toMatchObject({ status: "pass", evidence: "Fluid single-column layout (max-width:26em) in inline styles." });
+    const fixed = await runCheck("responsive_css", {}, { ...base, page: page("body{width:960px;margin:0 auto}") });
+    expect(fixed.status).toBe("fail");
+  });
+
   it("finds missing phrases and broken links", async () => {
     const ctx = ctxFor("good");
     const text = await runCheck("has_text", { phrases: ["Hackney", "Camden"] }, ctx);
@@ -114,6 +124,10 @@ describe("suspicious content", () => {
     const { flagged, findings } = findSuspicious(site("hostile"));
     expect(flagged).toBe(true);
     expect(findings.map((f) => f.where).sort()).toEqual(["comment", "hidden element"]);
+  });
+
+  it("separates headings and paragraphs in the visible text", () => {
+    expect(site("good").visibleText).toContain("Yirgacheffe, Ethiopia Jasmine, bergamot");
   });
 
   it("keeps hidden text out of what a visitor (and the AI judge) reads", () => {

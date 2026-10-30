@@ -39,6 +39,9 @@ export function parsePage(input: Omit<Page, "$" | "visibleText" | "title">): Pag
   visible("*")
     .filter((_, el) => isHidden(visible, el))
     .remove();
+  // Block elements end a line of text: without this, "<h3>Huila</h3><p>Red apple</p>" reads "HuilaRed apple".
+  visible("br").replaceWith(" ");
+  visible("p, div, h1, h2, h3, h4, h5, h6, li, dt, dd, section, article, header, footer, nav, main, aside, blockquote, figcaption, td, th, label, button, option").append(" ");
   return {
     ...input,
     $,

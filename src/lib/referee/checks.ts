@@ -97,6 +97,11 @@ async function responsiveCss(page: Page, ctx: CheckContext): Promise<CheckOutcom
     const fluid = /(\d(\.\d+)?(vw|fr)\b|clamp\(|minmax\(|auto-fit|auto-fill)/i.test(s.css);
     if (layout && fluid) return pass(`Fluid layout (flex/grid with relative sizes) in ${s.name}.`);
   }
+  for (const s of sources) {
+    // A single column capped in relative units shrinks with the screen (e.g. max-width: 26em; margin: auto).
+    const capped = s.css.match(/max-width\s*:\s*\d+(\.\d+)?(em|rem|ch|%|vw)\b/i);
+    if (capped) return pass(`Fluid single-column layout (${capped[0].replace(/\s+/g, " ")}) in ${s.name}.`);
+  }
   return fail(sources.length ? "No media queries or fluid layout found in the styles." : "No styles found on the page.");
 }
 

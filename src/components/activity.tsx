@@ -42,6 +42,12 @@ function describe(e: Event): string {
       return `authorized ${money(p.amountCents)}. The money is held, not captured.`;
     case "job.expired":
       return "expired the agreement: it wasn't funded in time";
+    case "delivery.submitted":
+      return `submitted M${p.position} (attempt ${p.attempt}): ${p.url}`;
+    case "evaluation.completed":
+      return `checked M${p.position}: ${String(p.verdict).replace("_", " ").toLowerCase()}${typeof p.releaseNowCents === "number" && p.releaseNowCents > 0 ? `, ${money(p.releaseNowCents)} to release` : ""}${p.suspicious ? " (flagged: instructions aimed at the AI)" : ""}`;
+    case "evaluation.failed":
+      return `couldn't finish checking M${p.position}: ${p.error}`;
     case "brief.agreed":
       return `accepted brief v${p.version}. Both sides agreed on the same version.`;
     default:

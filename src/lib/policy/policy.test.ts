@@ -93,6 +93,16 @@ describe("evaluate: guardrails", () => {
     expect(ev.reasons[0]).toMatch(/not found on the page/);
   });
 
+  it("a check that couldn't be measured goes to a human, never counts as a pass", () => {
+    const ev = evaluate({
+      ...base,
+      results: [check("a", true, 6), { ...check("lighthouse", false, 4, true), unmeasured: true }],
+    });
+    expect(ev.verdict).toBe("NEEDS_HUMAN");
+    expect(ev.reasons).toEqual(['Couldn\'t measure "lighthouse"']);
+    expect(ev.silenceReleaseCents).toBe(9000); // only the 6/10 backed by a passing check
+  });
+
   it("a confidently failed required judged criterion is FAIL", () => {
     const ev = evaluate({ ...base, results: [check("a", true, 8), judged("b", false, 0.9, 2, true)] });
     expect(ev.verdict).toBe("FAIL");

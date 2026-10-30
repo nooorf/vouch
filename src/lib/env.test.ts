@@ -35,6 +35,11 @@ describe("parseEnv", () => {
     }
   });
 
+  it("allows the referee's localhost switch only when the app itself runs on localhost", () => {
+    expect(parseEnv({ ...core, REFEREE_ALLOW_LOCALHOST: "true" }).REFEREE_ALLOW_LOCALHOST).toBe(true);
+    expect(() => parseEnv({ ...core, REFEREE_ALLOW_LOCALHOST: "true", APP_URL: "https://vouch.onrender.com" })).toThrow(/local development only/);
+  });
+
   it("refuses live PayPal", () => {
     expect(() => parseEnv({ ...core, PAYPAL_ENV: "live" })).toThrow(/sandbox/);
   });

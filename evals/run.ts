@@ -8,10 +8,11 @@
 import { closeDb } from "../src/db";
 import { briefSuite } from "./brief.eval";
 import { runSuite, type Suite } from "./harness";
+import { judgeSuite } from "./judge.eval";
 import { reviseSuite } from "./revise.eval";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const suites: Record<string, Suite<any, any>> = { brief: briefSuite, revise: reviseSuite };
+const suites: Record<string, Suite<any, any>> = { brief: briefSuite, revise: reviseSuite, judge: judgeSuite };
 
 const args = process.argv.slice(2);
 const fresh = args.includes("--fresh");

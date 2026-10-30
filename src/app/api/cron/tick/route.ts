@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
+import { drainTasks } from "@/lib/jobs/runner";
 import { dueJobIds, tickJob } from "@/lib/jobs/tick";
 
 /** Backup for jobs nobody is viewing. Called by a scheduler with `Authorization: Bearer $CRON_SECRET`. */
@@ -18,5 +19,6 @@ export async function GET(request: Request) {
       results[id] = [`error: ${err instanceof Error ? err.message : String(err)}`];
     }
   }
-  return Response.json({ checked: ids.length, results });
+  const tasksRun = await drainTasks({ limit: 5 });
+  return Response.json({ checked: ids.length, results, tasksRun });
 }

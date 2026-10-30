@@ -15,6 +15,7 @@ Day 1. Done so far:
 - Negotiation: the brief goes to the client at a private link; the client accepts, sends a note, or has AI turn their request into concrete edits (applied and diffed in code); both sides must accept the same version before funding.
 - Funding: the client pays with PayPal on the agreed brief; the agreed total is authorized (held, not captured), checked against the database, and milestones get due dates. Interrupted checkouts are recovered on the next page load; unfunded agreements expire after 72 hours.
 - Referee (measured part): an SSRF-safe fetcher, the check library (page structure, phone readiness, alt text, forms, phrases, links, size), Google Lighthouse via PageSpeed, GitHub repo checks, and a detector for content aimed at AI graders. Four demo delivery sites (good, flawed, fixed, hostile) are served at `/demo-sites/*`.
+- Referee (deciding part): deliveries are checked in a background task queue; the AI judge answers the subjective criteria from visible page text and a screenshot, and every quote it gives is verified against the page; the policy engine gives PASS / PARTIAL / FAIL / NEEDS_HUMAN with exact amounts, shown on an evaluation card to both sides.
 - `src/lib/policy/`: the policy engine (verdicts, partial releases, review window, capture guards), with tests.
 - `src/lib/brief/`: the brief schema, check library, agreement hash and demo brief, with tests.
 - `src/db/`: Postgres schema (Drizzle) for jobs, brief versions, milestones, evaluations, payments, the event ledger and a task queue; migrations in `drizzle/`.
@@ -33,10 +34,10 @@ npm run smoke                # PayPal sandbox smoke test (opens an approval link
 npm run smoke -- --payee     # same, paying a second sandbox account as the freelancer
 npm run env:check            # validate config and list which features are on
 npm run dev
-npm run e2e                  # browser walk-through of the demo against localhost:3000 (pays via the PayPal sandbox if DEMO_BUYER_* is set)
+npm run e2e                  # browser walk-through of the demo against localhost:3000 (funds with a sandbox test card; E2E_PAYPAL=popup to log in to PayPal's checkout instead)
 npm run referee -- <url>     # run the measured checks on any URL (REFEREE_ALLOW_LOCALHOST=true for local demo sites)
 npm run demo:cleanup         # remove demo workspaces and void their PayPal holds
-npm run eval                 # AI evals: drafted briefs scored against fixed expectations (add --fresh to skip cache)
+npm run eval                 # AI evals: brief drafting, change proposals and the judge (add --fresh to skip cache)
 ```
 
 ## Quality checks

@@ -42,7 +42,7 @@ export function stepIndex(status: JobStatus): number {
     case "FUNDED":
       return 3;
     case "IN_PROGRESS":
-      return 4;
+      return 3; // funded; delivering is what's happening now
     case "COMPLETED":
       return 5;
     default:
