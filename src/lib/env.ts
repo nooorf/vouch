@@ -41,6 +41,8 @@ const EnvSchema = z
     RESEND_API_KEY: opt(z.string().startsWith("re_", "RESEND_API_KEY starts with re_")),
     EMAIL_FROM: z.preprocess((v) => (v === "" ? undefined : v), z.string().default("onboarding@resend.dev")),
     CRON_SECRET: opt(z.string().min(16)),
+    /** Local development only: let the referee fetch http://localhost (e.g. the demo sites). */
+    REFEREE_ALLOW_LOCALHOST: flag,
   })
   .superRefine((e, ctx) => {
     if (!e.DATABASE_URL_POOLED && !e.DATABASE_URL) {
@@ -54,6 +56,9 @@ const EnvSchema = z
     }
     if (e.PAYPAL_CLIENT_ID && e.NEXT_PUBLIC_PAYPAL_CLIENT_ID && e.PAYPAL_CLIENT_ID !== e.NEXT_PUBLIC_PAYPAL_CLIENT_ID) {
       ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_PAYPAL_CLIENT_ID"], message: "NEXT_PUBLIC_PAYPAL_CLIENT_ID must equal PAYPAL_CLIENT_ID" });
+    }
+    if (e.NODE_ENV === "production" && e.REFEREE_ALLOW_LOCALHOST) {
+      ctx.addIssue({ code: "custom", path: ["REFEREE_ALLOW_LOCALHOST"], message: "REFEREE_ALLOW_LOCALHOST is for local development only" });
     }
     if (e.PAYPAL_ENV === "live") {
       ctx.addIssue({ code: "custom", path: ["PAYPAL_ENV"], message: "Vouch only runs against the PayPal sandbox" });
@@ -93,7 +98,7 @@ export const FEATURES = {
   paypalWebhooks: { label: "PayPal webhooks", needs: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET", "PAYPAL_WEBHOOK_ID"] },
   ai: { label: "AI (Gemini)", needs: ["GEMINI_API_KEY"] },
   githubChecks: { label: "GitHub repo checks", needs: ["GITHUB_TOKEN"] },
-  pagespeed: { label: "Lighthouse via PageSpeed", needs: ["PAGESPEED_API_KEY"] },
+  pagespeed: { label: "Lighthouse via PageSpeed (the keyless quota is shared and often used up)", needs: ["PAGESPEED_API_KEY"] },
   email: { label: "Email (Resend)", needs: ["RESEND_API_KEY"] },
   cron: { label: "External cron endpoint", needs: ["CRON_SECRET"] },
 } as const satisfies Record<string, { label: string; needs: (keyof Env)[] }>;

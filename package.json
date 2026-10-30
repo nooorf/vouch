@@ -19,12 +19,14 @@
     "e2e": "node --env-file-if-exists=.env.local --import tsx scripts/e2e.ts",
     "env:check": "node --env-file-if-exists=.env.local --import tsx scripts/env-check.ts",
     "eval": "node --env-file-if-exists=.env.local --import tsx evals/run.ts",
-    "demo:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-demo.ts"
+    "demo:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-demo.ts",
+    "referee": "node --env-file-if-exists=.env.local --import tsx scripts/referee.ts"
   },
   "dependencies": {
     "@google/genai": "2.32.0",
     "@paypal/paypal-server-sdk": "2.5.0",
     "@paypal/react-paypal-js": "10.6.1",
+    "cheerio": "1.2.0",
     "drizzle-orm": "0.45.4",
     "geist": "1.8.2",
     "next": "16.4.3",
