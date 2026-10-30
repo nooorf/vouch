@@ -41,7 +41,11 @@ export function BriefView({ brief }: { brief: Brief }) {
                     <span className="min-w-0">
                       {describeCriterion(c)}
                       {c.required && <span className="ml-2 text-xs font-medium text-held">must pass</span>}
-                      {c.kind === "judged" && c.visual && <span className="ml-2 text-xs text-muted">from a screenshot</span>}
+                      {c.kind === "judged" && c.source === "code" ? (
+                        <span className="ml-2 text-xs text-muted">from the code</span>
+                      ) : (
+                        c.kind === "judged" && c.visual && <span className="ml-2 text-xs text-muted">from a screenshot</span>
+                      )}
                     </span>
                   </div>
                   <span className="tabular shrink-0 font-mono text-muted" title="This criterion's share of the milestone">

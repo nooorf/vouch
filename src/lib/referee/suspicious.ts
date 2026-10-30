@@ -8,7 +8,7 @@ import { isHidden, normalizeText } from "./page";
  */
 
 export interface Finding {
-  where: "comment" | "hidden element" | "visible text" | "attribute";
+  where: "comment" | "hidden element" | "visible text" | "attribute" | "code";
   excerpt: string;
 }
 
@@ -86,4 +86,21 @@ export function findSuspicious(page: Page, hiddenText: string[] = []): { flagged
     return true;
   });
   return { flagged: unique.length > 0, findings: unique };
+}
+
+/**
+ * Instructions to the grader inside a delivered repository (comments, strings, docs), checked
+ * line by line. Only the strict patterns apply: AI apps legitimately contain prompts ("You are a
+ * helpful assistant"), but nothing in honest code tells *our* grader to approve or drop its rules.
+ */
+export function findCodeDirectives(files: { path: string; text: string }[]): Finding[] {
+  const findings: Finding[] = [];
+  for (const f of files) {
+    const lines = f.text.split("\n");
+    for (let i = 0; i < lines.length && findings.length < 10; i++) {
+      const text = normalizeText(lines[i].replace(/^\s*(\/\/+|#+|\*+|\/\*+|<!--|--)\s*/, ""));
+      if (text.length >= 12 && DIRECTIVES.some((re) => re.test(text))) findings.push({ where: "code", excerpt: clip(`${f.path}:${i + 1}: ${text}`) });
+    }
+  }
+  return findings;
 }

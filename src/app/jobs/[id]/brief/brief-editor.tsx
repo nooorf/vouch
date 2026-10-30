@@ -184,8 +184,19 @@ function CriterionRow({
                 className={`${small} w-full`}
               />
               <label className="flex items-center gap-2 text-sm text-muted">
-                <input type="checkbox" checked={c.visual} onChange={(e) => onChange({ ...c, visual: e.target.checked })} className="accent-[var(--brand)]" />
-                Judge from a screenshot of the page
+                Answer from
+                <select
+                  value={c.source === "code" ? "code" : c.visual ? "screenshot" : "page"}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onChange({ ...c, visual: v === "screenshot", source: v === "code" ? "code" : undefined });
+                  }}
+                  className={small}
+                >
+                  <option value="page">the page&apos;s text</option>
+                  <option value="screenshot">a screenshot of the page</option>
+                  <option value="code">the code in the GitHub repo</option>
+                </select>
               </label>
             </>
           )}

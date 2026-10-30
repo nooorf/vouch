@@ -37,6 +37,11 @@ export const JudgedCriterion = z.object({
   required: z.boolean().default(false),
   /** Judge from the rendered screenshot as well as the text. */
   visual: z.boolean().default(false),
+  /**
+   * What the question is about: the delivered page (default) or the delivered repository's code.
+   * Optional rather than defaulted, so briefs agreed before it existed keep their hash.
+   */
+  source: z.enum(["page", "code"]).optional(),
 });
 
 export const Criterion = z.discriminatedUnion("kind", [CheckCriterion, JudgedCriterion]);

@@ -7,13 +7,14 @@
  */
 import { closeDb } from "../src/db";
 import { briefSuite } from "./brief.eval";
+import { codeSuite } from "./code.eval";
 import { runSuite, type Suite } from "./harness";
 import { judgeSuite } from "./judge.eval";
 import { refereeSuite } from "./referee.eval";
 import { reviseSuite } from "./revise.eval";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const suites: Record<string, Suite<any, any>> = { brief: briefSuite, revise: reviseSuite, judge: judgeSuite, referee: refereeSuite };
+const suites: Record<string, Suite<any, any>> = { brief: briefSuite, revise: reviseSuite, judge: judgeSuite, code: codeSuite, referee: refereeSuite };
 
 const args = process.argv.slice(2);
 const fresh = args.includes("--fresh");

@@ -76,7 +76,7 @@ export function SubmitDelivery({
         {wantsRepo && (
           <>
             <label className="block text-sm font-medium" htmlFor="delivery-repo">
-              GitHub repository <span className="font-normal text-muted">(for the repo checks)</span>
+              GitHub repository <span className="font-normal text-muted">(public; the brief checks the code)</span>
             </label>
             <input id="delivery-repo" type="url" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="https://github.com/you/site" className={field} />
           </>

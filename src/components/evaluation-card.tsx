@@ -99,10 +99,42 @@ function ResultRow({ r, valueCents }: { r: RecordedResult; valueCents: number })
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge tone="info">AI · {Math.round((r.confidence ?? 0) * 100)}% sure</Badge>
               {r.evidenceSource === "screenshot" && r.evidenceVerified !== false && <Badge tone="neutral">From the screenshot</Badge>}
-              {r.evidenceVerified === true && <Badge tone="brand">Quote found on the page</Badge>}
-              {r.evidenceVerified === false && <Badge tone="danger">Quote not found on the page</Badge>}
+              {r.evidenceSource === "code" ? (
+                <>
+                  {r.evidenceVerified === true && <Badge tone="brand">Code found in the repo</Badge>}
+                  {r.evidenceVerified === false && <Badge tone="danger">Code not found in the repo</Badge>}
+                </>
+              ) : (
+                <>
+                  {r.evidenceVerified === true && <Badge tone="brand">Quote found on the page</Badge>}
+                  {r.evidenceVerified === false && <Badge tone="danger">Quote not found on the page</Badge>}
+                </>
+              )}
             </div>
-            {r.evidence && <blockquote className="border-l-2 border-line pl-3 text-muted italic">{r.evidence}</blockquote>}
+            {r.evidenceSource === "code" && r.codeRefs?.length ? (
+              <div className="space-y-2">
+                {r.codeRefs.map((ref) => (
+                  <figure key={`${ref.path}:${ref.startLine}`} className="overflow-hidden rounded-md border border-line">
+                    <figcaption className="border-b border-line bg-surface-2 px-3 py-1 font-mono text-xs">
+                      <a href={ref.url} target="_blank" rel="noreferrer" className="text-brand hover:underline">
+                        {ref.path}:{ref.startLine}
+                        {ref.endLine > ref.startLine ? `-${ref.endLine}` : ""}
+                      </a>
+                    </figcaption>
+                    <pre className="overflow-x-auto px-3 py-2 font-mono text-xs leading-relaxed text-muted">
+                      {ref.snippet.split("\n").map((line, i) => (
+                        <div key={i}>
+                          <span className="mr-3 inline-block w-8 text-right opacity-50 select-none">{ref.startLine + i}</span>
+                          {line}
+                        </div>
+                      ))}
+                    </pre>
+                  </figure>
+                ))}
+              </div>
+            ) : (
+              r.evidence && r.evidenceSource !== "code" && <blockquote className="border-l-2 border-line pl-3 text-muted italic">{r.evidence}</blockquote>
+            )}
             {r.explanation && <p className="text-muted">{r.explanation}</p>}
           </div>
         )}
@@ -219,6 +251,22 @@ export function EvaluationCard({
         </p>
       )}
       {report && !report.rendered && report.renderError && <p className="mt-3 text-xs text-muted">Not loaded in a real browser: {report.renderError}.</p>}
+      {measurements?.code?.repo && (
+        <p className="mt-3 text-xs text-muted">
+          Code read from{" "}
+          <a
+            href={`https://github.com/${measurements.code.repo.owner}/${measurements.code.repo.repo}/tree/${measurements.code.repo.sha}`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-brand hover:underline"
+          >
+            {measurements.code.repo.owner}/{measurements.code.repo.repo}@{measurements.code.repo.sha.slice(0, 7)}
+          </a>{" "}
+          ({measurements.code.repo.branch}): {measurements.code.clipped ? `the ${measurements.code.filesShown.length} files most relevant to the questions` : `all ${measurements.code.filesShown.length} source files`}
+          {measurements.code.repo.skipped ? `; ${measurements.code.repo.skipped} dependency, build or binary files skipped` : ""}.
+        </p>
+      )}
+      {measurements?.code?.error && !measurements.code.repo && <p className="mt-3 text-xs text-muted">The code couldn&apos;t be read: {measurements.code.error}</p>}
       {ps?.ok && (
         <p className="mt-3 text-xs text-muted">
           Google Lighthouse (mobile): accessibility {ps.scores.accessibility ?? "–"} · performance {ps.scores.performance ?? "–"} · SEO {ps.scores.seo ?? "–"}

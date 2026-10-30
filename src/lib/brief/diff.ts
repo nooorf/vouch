@@ -34,6 +34,9 @@ function diffCriteria(where: string, before: Criterion[], after: Criterion[], ou
     if (old.kind === "judged" && c.kind === "judged" && old.visual !== c.visual) {
       out.push({ where, kind: "changed", text: `“${describeCriterion(c)}” ${c.visual ? "is now" : "is no longer"} judged from a screenshot` });
     }
+    if (old.kind === "judged" && c.kind === "judged" && (old.source ?? "page") !== (c.source ?? "page")) {
+      out.push({ where, kind: "changed", text: `“${describeCriterion(c)}” is now judged from ${c.source === "code" ? "the code in the repo" : "the page"}` });
+    }
   }
 }
 

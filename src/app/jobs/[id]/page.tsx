@@ -105,7 +105,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
               milestoneId={current.id}
               position={current.position}
               title={current.title}
-              wantsRepo={current.criteria.some((c) => c.kind === "check" && ["repo_readme", "repo_fresh_commits", "ci_passing"].includes(c.checkId))}
+              wantsRepo={current.criteria.some((c) => (c.kind === "check" && ["repo_readme", "repo_fresh_commits", "ci_passing"].includes(c.checkId)) || (c.kind === "judged" && c.source === "code"))}
               demo={user.demo}
               resubmission={current.attempts > 0}
             />

@@ -6,8 +6,11 @@ import { env } from "@/lib/env";
 import { registerTask } from "@/lib/jobs/tasks";
 import { LlmUnavailableError } from "@/lib/llm";
 import { evaluate, type CriterionResult, type Evaluation } from "@/lib/policy/policy";
+import { judgeCode, type CodeJudgeOutput, type CodeRef } from "./code-judge";
 import { judge, type JudgeOutput } from "./judge";
+import { fetchRepoSnapshot } from "./repo-snapshot";
 import { runReferee, type RefereeReport } from "./run";
+import { findCodeDirectives } from "./suspicious";
 
 /** What we store per criterion: the policy's input plus what the evaluation card shows. */
 export interface RecordedResult extends CriterionResult {
@@ -15,16 +18,35 @@ export interface RecordedResult extends CriterionResult {
   kind: "check" | "judged";
   checkId?: string;
   explanation?: string;
-  evidenceSource?: "page_text" | "screenshot" | "none";
+  evidenceSource?: "page_text" | "screenshot" | "code" | "none";
+  /** Code questions: the verified places in the repository, with links at the judged commit. */
+  codeRefs?: CodeRef[];
+}
+
+/** What happened when the referee read the delivered code. */
+export interface CodeAssessment {
+  judged: CodeJudgeOutput | null;
+  /** Why the code couldn't be judged (no repo, private, AI unavailable…). */
+  error: string | null;
+  /** No repository link was submitted at all: a fail, not "couldn't measure". */
+  missingRepo: boolean;
+  repo: { owner: string; repo: string; sha: string; branch: string; files: number; skipped: number } | null;
 }
 
 export interface Measurements {
   report: Omit<RefereeReport, "screenshot" | "pageText">;
   judge: { model: string; cached: boolean } | { error: string } | null;
+  code?: { repo: CodeAssessment["repo"]; filesShown: string[]; clipped: boolean; model: string | null; error: string | null } | null;
 }
 
 /** Turn measured checks and judge answers into policy input, in brief order. */
-export function toResults(criteria: typeof schema.milestones.$inferSelect["criteria"], report: RefereeReport, judged: JudgeOutput | null, judgeError: string | null): RecordedResult[] {
+export function toResults(
+  criteria: typeof schema.milestones.$inferSelect["criteria"],
+  report: RefereeReport,
+  judged: JudgeOutput | null,
+  judgeError: string | null,
+  code: CodeAssessment | null = null,
+): RecordedResult[] {
   return criteria.map((c): RecordedResult => {
     const base = { id: c.id, label: describeCriterion(c), weight: c.weight, required: c.required, kind: c.kind };
     if (c.kind === "check") {
@@ -38,6 +60,27 @@ export function toResults(criteria: typeof schema.milestones.$inferSelect["crite
         unmeasured: status === "error",
         evidence: m?.evidence ?? "Not measured.",
         fixHint: status === "fail" ? m?.evidence : undefined,
+      };
+    }
+    if (c.source === "code") {
+      if (code?.missingRepo) {
+        return { ...base, status: "fail", passed: false, confidence: 1, evidence: "", explanation: "No GitHub repository was submitted, so the code couldn't be checked.", evidenceSource: "none", fixHint: "Submit the GitHub repository link with your delivery." };
+      }
+      const cj = code?.judged?.results.find((r) => r.criterionId === c.id);
+      if (!cj) {
+        return { ...base, status: "error", passed: false, confidence: 0, evidence: "", explanation: code?.error ? `The code couldn't be judged: ${code.error}` : "The AI judge gave no answer.", evidenceSource: "none" };
+      }
+      return {
+        ...base,
+        status: cj.passed ? "pass" : "fail",
+        passed: cj.passed,
+        confidence: cj.confidence,
+        evidenceVerified: cj.evidenceVerified,
+        evidence: cj.evidence,
+        explanation: cj.explanation,
+        evidenceSource: "code",
+        codeRefs: cj.codeRefs,
+        fixHint: cj.passed ? undefined : cj.explanation || `Not met: ${c.rubric}`,
       };
     }
     const j = judged?.results.find((r) => r.criterionId === c.id);
@@ -80,6 +123,7 @@ export interface Assessment {
   report: RefereeReport;
   judged: JudgeOutput | null;
   judgeError: string | null;
+  code: CodeAssessment | null;
   results: RecordedResult[];
   verdict: Evaluation;
 }
@@ -89,7 +133,11 @@ export interface Assessment {
  * real-world benchmark run exactly this.
  */
 export async function assessDelivery(input: AssessInput): Promise<Assessment> {
-  const judgedCriteria = input.criteria.filter((c): c is JudgedCriterion => c.kind === "judged");
+  const allJudged = input.criteria.filter((c): c is JudgedCriterion => c.kind === "judged");
+  const judgedCriteria = allJudged.filter((c) => c.source !== "code");
+  const codeCriteria = allJudged.filter((c) => c.source === "code");
+  // Read the code alongside the page.
+  const codePromise = codeCriteria.length ? assessCode(codeCriteria, input.repoUrl ?? null, input.objection ?? null) : Promise.resolve(null);
   const report = await runReferee({
     url: input.url,
     repoUrl: input.repoUrl,
@@ -127,14 +175,39 @@ export async function assessDelivery(input: AssessInput): Promise<Assessment> {
     judgeError = "the page couldn't be loaded";
   }
 
-  const results = toResults(input.criteria, report, judged, judgeError);
+  const code = await codePromise;
+  if (code?.findings.length) {
+    report.suspicious = { flagged: true, findings: [...report.suspicious.findings, ...code.findings] };
+  }
+  const results = toResults(input.criteria, report, judged, judgeError, code);
   const verdict = evaluate({
     milestoneAmountCents: input.milestoneAmountCents,
     alreadyReleasedCents: input.alreadyReleasedCents,
     results,
     suspicious: report.suspicious.flagged,
   });
-  return { report, judged, judgeError, results, verdict };
+  return { report, judged, judgeError, code, results, verdict };
+}
+
+/** Read the delivered repository at its latest commit, scan it for instructions to the grader, and judge the code questions. */
+async function assessCode(
+  criteria: JudgedCriterion[],
+  repoUrl: string | null,
+  objection: AssessInput["objection"],
+): Promise<CodeAssessment & { findings: ReturnType<typeof findCodeDirectives> }> {
+  const none = { judged: null, repo: null, findings: [] };
+  if (!repoUrl) return { ...none, error: null, missingRepo: true };
+  const snap = await fetchRepoSnapshot(repoUrl);
+  if (!snap.ok) return { ...none, error: snap.error, missingRepo: false };
+  const repo = { owner: snap.owner, repo: snap.repo, sha: snap.sha, branch: snap.branch, files: snap.files.length, skipped: snap.skipped };
+  const findings = findCodeDirectives(snap.files);
+  try {
+    const judged = await judgeCode({ criteria, snapshot: snap, objection });
+    return { judged, error: null, missingRepo: false, repo, findings };
+  } catch (err) {
+    if (!(err instanceof LlmUnavailableError)) throw err;
+    return { judged: null, error: err.message, missingRepo: false, repo, findings };
+  }
 }
 
 function reviewWindowSeconds(job: typeof schema.jobs.$inferSelect) {
@@ -156,7 +229,7 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
 
   await db.update(schema.evaluations).set({ status: "running" }).where(eq(schema.evaluations.id, evaluationId));
 
-  const { report, judged, judgeError, results, verdict } = await assessDelivery({
+  const { report, judged, judgeError, code, results, verdict } = await assessDelivery({
     url: delivery.url,
     repoUrl: delivery.repoUrl,
     criteria: milestone.criteria,
@@ -172,6 +245,9 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
   const measurements: Measurements = {
     report: reportForStorage,
     judge: judged ? { model: judged.model, cached: judged.cached } : judgeError ? { error: judgeError } : null,
+    code: code
+      ? { repo: code.repo, filesShown: code.judged?.filesShown ?? [], clipped: code.judged?.clipped ?? false, model: code.judged?.model ?? null, error: code.error }
+      : null,
   };
   const now = new Date();
 
