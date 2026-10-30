@@ -1,24 +1,34 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { BriefView, VersionChanges } from "@/components/brief-view";
 import { JobTimeline, ViewSwitcher } from "@/components/job-bits";
+import { MilestoneList } from "@/components/milestones";
+import { MoneyBar } from "@/components/money-bar";
 import { Badge, Card, Container } from "@/components/ui";
 import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
+import { env, hasFeature } from "@/lib/env";
 import { findJobByClientToken } from "@/lib/jobs/agreement";
+import { tickJob } from "@/lib/jobs/tick";
 import { stepIndex } from "@/lib/jobs/status";
 import { formatCents } from "@/lib/money";
 import { getCurrentUser } from "@/lib/session";
 import { ClientActions } from "./client-actions";
+import { FundCard } from "./fund-card";
 
 // The link is the client's key: never leak it to other sites through the Referer header.
 export const metadata: Metadata = { title: "Brief for review", referrer: "no-referrer", robots: { index: false } };
 
 export default async function ClientPage(props: PageProps<"/c/[token]">) {
   const { token } = await props.params;
-  const job = await findJobByClientToken(token);
-  if (!job) notFound();
+  const found = await findJobByClientToken(token);
+  if (!found) notFound();
+  // Bring the job up to date first (e.g. a PayPal approval we haven't recorded yet).
+  await tickJob(found.id);
+  const job = (await findJobByClientToken(token))!;
+  const milestones = await db.select().from(schema.milestones).where(eq(schema.milestones.jobId, job.id)).orderBy(asc(schema.milestones.position));
+  const e = env();
 
   const [owner] = await db.select().from(schema.users).where(eq(schema.users.id, job.ownerId));
   const versions = await db
@@ -68,6 +78,7 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
+          <MilestoneList milestones={milestones} />
           {previous && job.status === "PROPOSED" && <VersionChanges changes={diffBriefs(previous.content, shown.content)} fromVersion={previous.versionNo} />}
           <BriefView brief={shown.content} />
         </div>
@@ -100,16 +111,42 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
               {pendingRequest && <blockquote className="mt-3 border-l-2 border-line pl-3 text-sm text-muted">{pendingRequest}</blockquote>}
             </Card>
           )}
-          {job.agreedVersionId && (
-            <Card className="p-5">
-              <Badge tone="brand">Agreed</Badge>
-              <p className="mt-3 text-sm">
+          {job.status === "AGREED" && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted">
                 You and {owner?.name ?? "the freelancer"} agreed on v{shown.versionNo}
                 {job.agreedAt ? ` on ${job.agreedAt.toLocaleDateString("en-US", { dateStyle: "medium" })}` : ""}. This is exactly what each delivery
                 will be checked against.
               </p>
-              <p className="tabular mt-4 font-mono text-2xl font-semibold">{formatCents(shown.content.totalCents)}</p>
-              <p className="mt-1 text-sm text-muted">Next: fund the job with PayPal. The money is held, not sent.</p>
+              {hasFeature("paypal") ? (
+                <FundCard
+                  token={token}
+                  clientId={e.NEXT_PUBLIC_PAYPAL_CLIENT_ID!}
+                  totalCents={job.totalCents}
+                  fundBy={job.fundingExpiresAt ? job.fundingExpiresAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC" : null}
+                  demoBuyer={job.isDemo && e.DEMO_BUYER_EMAIL && e.DEMO_BUYER_PASSWORD ? { email: e.DEMO_BUYER_EMAIL, password: e.DEMO_BUYER_PASSWORD } : null}
+                />
+              ) : (
+                <Card className="p-5 text-sm text-muted">PayPal isn&apos;t configured on this server yet.</Card>
+              )}
+            </div>
+          )}
+          {(job.status === "FUNDED" || job.status === "IN_PROGRESS" || job.status === "COMPLETED") && (
+            <Card className="p-5">
+              <Badge tone="brand">{job.status === "COMPLETED" ? "Completed" : "Funded"}</Badge>
+              <p className="mt-3 text-sm">
+                {formatCents(job.authorizedCents)} is held by PayPal. Each milestone is paid only when its delivery passes the agreed checks or you approve
+                it.
+              </p>
+              <div className="mt-4">
+                <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} />
+              </div>
+            </Card>
+          )}
+          {job.status === "EXPIRED" && (
+            <Card className="p-5">
+              <Badge tone="neutral">Expired</Badge>
+              <p className="mt-3 text-sm">This agreement wasn&apos;t funded in time, so it expired. Nothing was charged.</p>
             </Card>
           )}
         </aside>

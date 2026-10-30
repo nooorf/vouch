@@ -13,6 +13,7 @@ Day 1. Done so far:
 - App shell: landing page, "Try the demo" (a private demo workspace per visitor, signed session cookie) and the freelancer dashboard with the money bar.
 - Job creation: describe the work, Gemini drafts a brief (structured JSON, repaired and validated in code), then a full editor with live lint warnings and the share of each payment backed by measured checks.
 - Negotiation: the brief goes to the client at a private link; the client accepts, sends a note, or has AI turn their request into concrete edits (applied and diffed in code); both sides must accept the same version before funding.
+- Funding: the client pays with PayPal on the agreed brief; the agreed total is authorized (held, not captured), checked against the database, and milestones get due dates. Interrupted checkouts are recovered on the next page load; unfunded agreements expire after 72 hours.
 - `src/lib/policy/`: the policy engine (verdicts, partial releases, review window, capture guards), with tests.
 - `src/lib/brief/`: the brief schema, check library, agreement hash and demo brief, with tests.
 - `src/db/`: Postgres schema (Drizzle) for jobs, brief versions, milestones, evaluations, payments, the event ledger and a task queue; migrations in `drizzle/`.
@@ -31,7 +32,8 @@ npm run smoke                # PayPal sandbox smoke test (opens an approval link
 npm run smoke -- --payee     # same, paying a second sandbox account as the freelancer
 npm run env:check            # validate config and list which features are on
 npm run dev
-npm run e2e                  # browser walk-through of the demo against localhost:3000
+npm run e2e                  # browser walk-through of the demo against localhost:3000 (pays via the PayPal sandbox if DEMO_BUYER_* is set)
+npm run demo:cleanup         # remove demo workspaces and void their PayPal holds
 npm run eval                 # AI evals: drafted briefs scored against fixed expectations (add --fresh to skip cache)
 ```
 

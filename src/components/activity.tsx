@@ -1,4 +1,5 @@
 import type { schema } from "@/db";
+import { formatCents } from "@/lib/money";
 import { Card } from "./ui";
 
 type Event = typeof schema.events.$inferSelect;
@@ -11,6 +12,8 @@ const who: Record<Event["source"], string> = {
   app: "Vouch",
   system: "Vouch",
 };
+
+const money = (c: unknown) => (typeof c === "number" ? formatCents(c) : "");
 
 function describe(e: Event): string {
   const p = e.payload as Record<string, unknown>;
@@ -31,6 +34,14 @@ function describe(e: Event): string {
       return `proposed v${p.version} with AI-drafted edits: “${p.note}”`;
     case "brief.revising":
       return `started revising the client's v${p.from}`;
+    case "payment.order_created":
+      return `opened PayPal checkout for ${money(p.amountCents)}`;
+    case "payment.authorization_pending":
+      return "is reviewing the payment";
+    case "payment.authorized":
+      return `authorized ${money(p.amountCents)}. The money is held, not captured.`;
+    case "job.expired":
+      return "expired the agreement: it wasn't funded in time";
     case "brief.agreed":
       return `accepted brief v${p.version}. Both sides agreed on the same version.`;
     default:

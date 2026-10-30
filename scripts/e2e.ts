@@ -40,6 +40,47 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 }
 
+/**
+ * Drive PayPal's sandbox checkout popup: email, password, then approve. PayPal navigates between
+ * these screens on its own, so poll for whichever screen is showing instead of a fixed script.
+ */
+async function approveInPayPalPopup(popup: Page, email: string, password: string) {
+  const submit = '#payment-submit-btn, button[data-testid="submit-button-initial"], button[data-id="payment-submit-btn"]';
+  const visible = async (sel: string) => {
+    const el = await popup.$(sel);
+    return el ? el.isVisible() : false;
+  };
+  const done = { email: false, password: false };
+  const deadline = Date.now() + 150_000;
+  while (Date.now() < deadline) {
+    if (popup.isClosed()) return; // PayPal closes the popup after approval
+    try {
+      if (await visible(submit)) {
+        await popup.click(submit);
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      if (!done.password && (await visible("#password"))) {
+        await popup.click("#password", { count: 3 });
+        await popup.type("#password", password);
+        await popup.click("#btnLogin");
+        done.password = true;
+      } else if (!done.email && (await visible("#email"))) {
+        await popup.click("#email", { count: 3 });
+        await popup.type("#email", email);
+        if (await visible("#btnNext")) await popup.click("#btnNext");
+        done.email = true;
+      }
+    } catch (err) {
+      // "Execution context was destroyed" etc.: PayPal navigated mid-action. Look again.
+      if (popup.isClosed()) return;
+      if (!/context|detached|navigat|Target closed/i.test(String(err))) throw err;
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error("PayPal popup did not finish within 150 s");
+}
+
 async function main() {
   console.log(`E2E against ${BASE}\n`);
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ["--no-first-run"] });
@@ -171,6 +212,44 @@ async function main() {
     });
     await shot(page, "client-agreed");
 
+    const buyerEmail = process.env.DEMO_BUYER_EMAIL;
+    const buyerPassword = process.env.DEMO_BUYER_PASSWORD;
+    await step("PayPal button renders on the agreed brief", async () => {
+      const iframe = await page.waitForSelector('iframe[title*="PayPal"]', { timeout: 45_000 });
+      const frame = await iframe!.contentFrame();
+      await frame.waitForSelector('[data-funding-source="paypal"]', { visible: true, timeout: 45_000 });
+    });
+    await shot(page, "client-fund");
+
+    if (!buyerEmail || !buyerPassword) {
+      console.log("  - Skipping PayPal funding: set DEMO_BUYER_EMAIL and DEMO_BUYER_PASSWORD in .env.local");
+    } else {
+      await step("Client funds the job with the PayPal sandbox", async () => {
+        await text("Fund the job to start the work.");
+        const iframe = await page.waitForSelector('iframe[title*="PayPal"]', { timeout: 30_000 });
+        const frame = await iframe!.contentFrame();
+        const popupPromise = new Promise<Page>((resolve) =>
+          browser.once("targetcreated", async (t) => {
+            const p = await t.page();
+            if (p) resolve(p);
+          }),
+        );
+        await frame.waitForSelector('[data-funding-source="paypal"]', { visible: true, timeout: 30_000 });
+        await frame.click('[data-funding-source="paypal"]');
+        const popup = await popupPromise;
+        await approveInPayPalPopup(popup, buyerEmail, buyerPassword);
+        await text("is held by PayPal", 120_000);
+      });
+      await shot(page, "client-funded");
+
+      await step("Freelancer sees the job funded with milestones", async () => {
+        await nav(() => clickByText(page, "a", "Freelancer"));
+        await text("Funded");
+        await text("Waiting for delivery");
+        await text("authorized");
+      });
+    }
+
     await step("The agreed brief is locked", async () => {
       await nav(() => clickByText(page, "a", "Freelancer"));
       const res = await page.goto(page.url().replace(/\?.*$/, "") + "/brief", { waitUntil: "networkidle0" });
@@ -179,7 +258,7 @@ async function main() {
 
     await step("Dashboard lists the job", async () => {
       await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle0" });
-      await text("agreed");
+      await text(buyerEmail && buyerPassword ? "funded" : "agreed");
     });
 
     if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);

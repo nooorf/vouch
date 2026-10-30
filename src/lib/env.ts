@@ -27,6 +27,9 @@ const EnvSchema = z
     NEXT_PUBLIC_PAYPAL_CLIENT_ID: opt(z.string().min(10)),
     PAYPAL_WEBHOOK_ID: opt(z.string().min(5)),
     PAYPAL_FREELANCER_EMAIL: opt(z.email("PAYPAL_FREELANCER_EMAIL must be an email")),
+    /** Sandbox buyer shown on demo client pages so judges can pay (sandbox only, not a secret). */
+    DEMO_BUYER_EMAIL: opt(z.email("DEMO_BUYER_EMAIL must be an email")),
+    DEMO_BUYER_PASSWORD: opt(z.string().min(1)),
 
     LLM_PROVIDER: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["gemini"]).default("gemini")),
     GEMINI_API_KEY: opt(z.string().min(20)),

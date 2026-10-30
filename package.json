@@ -16,13 +16,15 @@
     "db:check": "node --env-file-if-exists=.env.local --import tsx scripts/db-check.ts",
     "brief:try": "node --env-file-if-exists=.env.local --import tsx scripts/draft-brief.ts",
     "demo:warm": "node --env-file-if-exists=.env.local --import tsx scripts/warm-ai-cache.ts",
-    "e2e": "node --import tsx scripts/e2e.ts",
+    "e2e": "node --env-file-if-exists=.env.local --import tsx scripts/e2e.ts",
     "env:check": "node --env-file-if-exists=.env.local --import tsx scripts/env-check.ts",
-    "eval": "node --env-file-if-exists=.env.local --import tsx evals/run.ts"
+    "eval": "node --env-file-if-exists=.env.local --import tsx evals/run.ts",
+    "demo:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-demo.ts"
   },
   "dependencies": {
     "@google/genai": "2.32.0",
     "@paypal/paypal-server-sdk": "2.5.0",
+    "@paypal/react-paypal-js": "10.6.1",
     "drizzle-orm": "0.45.4",
     "geist": "1.8.2",
     "next": "16.4.3",

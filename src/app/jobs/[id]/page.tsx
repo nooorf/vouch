@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { Activity } from "@/components/activity";
 import { BriefView, VersionChanges } from "@/components/brief-view";
 import { CopyLink, JobTimeline, ViewSwitcher } from "@/components/job-bits";
+import { MilestoneList } from "@/components/milestones";
 import { MoneyBar } from "@/components/money-bar";
 import { Badge, Card, Container, LinkButton } from "@/components/ui";
 import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
 import { clientUrlFor } from "@/lib/jobs/agreement";
 import { stepIndex } from "@/lib/jobs/status";
+import { tickJob } from "@/lib/jobs/tick";
 import { formatCents } from "@/lib/money";
 import { requireUser } from "@/lib/session";
 import { ProposalActions } from "./proposal-actions";
@@ -24,6 +26,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   const search = await props.searchParams;
   const user = await requireUser();
   if (!UUID.test(id)) notFound();
+  await tickJob(id);
 
   const [job] = await db
     .select()
@@ -38,6 +41,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
     .orderBy(desc(schema.briefVersions.versionNo));
   const latest = versions[0];
   const shown = (job.agreedVersionId && versions.find((v) => v.id === job.agreedVersionId)) || latest;
+  const milestones = await db.select().from(schema.milestones).where(eq(schema.milestones.jobId, id)).orderBy(asc(schema.milestones.position));
   const events = await db.select().from(schema.events).where(eq(schema.events.jobId, id)).orderBy(desc(schema.events.id)).limit(50);
 
   const clientUrl = clientUrlFor(job);
@@ -87,6 +91,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
             </Card>
           )}
           {clientProposal && beforeProposal && <VersionChanges changes={diffBriefs(beforeProposal.content, clientProposal.content)} fromVersion={beforeProposal.versionNo} />}
+          <MilestoneList milestones={milestones} />
           <BriefView brief={shown.content} />
         </div>
 
@@ -129,10 +134,24 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
                 </p>
               </>
             )}
-            {job.agreedVersionId && (
+            {job.status === "AGREED" && (
               <>
                 <h2 className="font-semibold">Agreed on v{shown.versionNo}</h2>
                 <p className="mt-2 text-sm text-muted">The brief is locked. Waiting for the client to fund the job with PayPal.</p>
+              </>
+            )}
+            {(job.status === "FUNDED" || job.status === "IN_PROGRESS") && (
+              <>
+                <h2 className="font-semibold">Funded</h2>
+                <p className="mt-2 text-sm text-muted">
+                  PayPal is holding {formatCents(job.authorizedCents)} for this job. Deliver each milestone to get paid for it.
+                </p>
+              </>
+            )}
+            {job.status === "EXPIRED" && (
+              <>
+                <h2 className="font-semibold">Expired</h2>
+                <p className="mt-2 text-sm text-muted">The client didn&apos;t fund the job in time. Nothing was charged.</p>
               </>
             )}
             {clientUrl && (
