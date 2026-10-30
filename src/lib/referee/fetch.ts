@@ -15,7 +15,15 @@ import zlib from "node:zlib";
  */
 
 export class FetchBlockedError extends Error {
-  constructor(message: string) {
+  /**
+   * blocked: refused by our rules (bad URL, private address, too many redirects): the delivery's fault.
+   * timeout: the page was too slow: the delivery's fault.
+   * network: DNS or connection failure, which can be on our side: retry, and never fail a delivery on it.
+   */
+  constructor(
+    message: string,
+    readonly kind: "blocked" | "timeout" | "network" = "blocked",
+  ) {
     super(message);
     this.name = "FetchBlockedError";
   }
@@ -122,7 +130,12 @@ export function checkUrl(raw: string, opts: { allowAnyPort?: boolean } = {}): UR
 async function resolveSafe(hostname: string, allow?: (ip: string) => boolean): Promise<{ address: string; family: 4 | 6 }> {
   const bare = hostname.replace(/^\[|\]$/g, "");
   const literal = isIP(bare);
-  const candidates = literal ? [{ address: bare, family: literal as 4 | 6 }] : ((await dnsLookup(bare, { all: true, verbatim: true })) as { address: string; family: 4 | 6 }[]);
+  let candidates: { address: string; family: 4 | 6 }[];
+  try {
+    candidates = literal ? [{ address: bare, family: literal as 4 | 6 }] : ((await dnsLookup(bare, { all: true, verbatim: true })) as { address: string; family: 4 | 6 }[]);
+  } catch (err) {
+    throw new FetchBlockedError(`Couldn't look up ${hostname} (${(err as NodeJS.ErrnoException).code ?? "DNS error"}).`, "network");
+  }
   if (!candidates.length) throw new FetchBlockedError(`Couldn't find ${hostname}.`);
   // Every address must be public: a hostname resolving to both public and private is refused.
   for (const c of candidates) {
@@ -229,7 +242,8 @@ export async function safeFetch(raw: string, options: FetchOptions = {}): Promis
       res = await requestOnce(url, pinned, { maxBytes, method }, deadline);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new FetchBlockedError(msg === "timeout" || Date.now() >= deadline ? "The page took too long to respond." : `Couldn't load the page (${msg}).`);
+      if (msg === "timeout" || Date.now() >= deadline) throw new FetchBlockedError("The page took too long to respond.", "timeout");
+      throw new FetchBlockedError(`Couldn't reach the page (${msg}).`, "network");
     }
     if (res.status >= 300 && res.status < 400 && res.headers.location) {
       if (redirects.length >= maxRedirects) throw new FetchBlockedError("Too many redirects.");

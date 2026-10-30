@@ -1,6 +1,7 @@
 import type { CheckId } from "@/lib/brief/checks";
 import type { RepoOutcome } from "./github";
 import { fold, type Page } from "./page";
+import { findPlaceholders } from "./placeholder";
 import type { PageSpeedOutcome } from "./pagespeed";
 
 /**
@@ -24,6 +25,8 @@ export interface CheckContext {
   repo: () => Promise<RepoOutcome | null>;
   /** Allow plain http (local development only). */
   allowHttp?: boolean;
+  /** The page couldn't be reached for network reasons (possibly ours): checks report "error", not "fail". */
+  unreachable?: boolean;
 }
 
 const pass = (evidence: string, measured?: Record<string, unknown>): CheckOutcome => ({ status: "pass", evidence, measured });
@@ -37,6 +40,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 
 function httpOk(ctx: CheckContext): CheckOutcome {
   const p = ctx.page;
+  if (!p && ctx.unreachable) return error(`${(ctx.fetchError ?? "The page couldn't be reached").replace(/\.$/, "")}. This may be a network problem on our side, so it isn't counted as a fail.`);
   if (!p) return fail(ctx.fetchError ?? "The page couldn't be loaded.");
   const https = p.finalUrl.startsWith("https://") || (ctx.allowHttp ?? false);
   const measured = { status: p.status, ms: p.ms, https: p.finalUrl.startsWith("https://") };
@@ -185,6 +189,12 @@ async function linksOk(page: Page, ctx: CheckContext): Promise<CheckOutcome> {
   return broken.length === 0 ? pass(list.length === 1 ? "The internal link works." : `All ${list.length} internal links work.`, measured) : fail(`${ok} of ${plural(list.length, "internal link")} work. Broken: ${broken.slice(0, 3).join(", ")}.`, measured);
 }
 
+function noPlaceholderText(page: Page): CheckOutcome {
+  const found = findPlaceholders(page.visibleText);
+  if (!found.length) return pass("No placeholder text found.");
+  return fail(`Placeholder text left in: ${found.slice(0, 3).map((f) => `${f.label} (“…${f.excerpt.slice(0, 60)}…”)`).join("; ")}.`, { found: found.map((f) => f.label) });
+}
+
 function pageWeight(page: Page, maxKb: number): CheckOutcome {
   const kb = Math.ceil(page.bytes / 1024);
   return kb <= maxKb ? pass(`The HTML is ${kb} KB (limit ${maxKb} KB).`, { kb }) : fail(`The HTML is ${kb} KB, over the ${maxKb} KB limit.`, { kb });
@@ -234,6 +244,7 @@ export async function runCheck(checkId: CheckId, params: Record<string, unknown>
   if (checkId === "repo_readme" || checkId === "repo_fresh_commits" || checkId === "ci_passing") return repoCheck(ctx, checkId);
 
   const page = ctx.page;
+  if (!page && ctx.unreachable) return error(`Not checked: the page couldn't be reached.`);
   if (!page) return fail(`Not checked: ${(ctx.fetchError ?? "the page couldn't be loaded").replace(/\.$/, "")}.`);
   switch (checkId) {
     case "has_h1":
@@ -254,5 +265,7 @@ export async function runCheck(checkId: CheckId, params: Record<string, unknown>
       return linksOk(page, ctx);
     case "page_weight":
       return pageWeight(page, Number(params.maxKb));
+    case "no_placeholder_text":
+      return noPlaceholderText(page);
   }
 }

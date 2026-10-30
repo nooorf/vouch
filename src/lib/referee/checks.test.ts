@@ -82,6 +82,15 @@ describe("measured checks on the demo sites", () => {
     expect(fixed.status).toBe("fail");
   });
 
+  it("flags leftover placeholder text, and passes real copy", async () => {
+    const page = (body: string) => parsePage({ url: ORIGIN, finalUrl: ORIGIN, status: 200, ms: 1, bytes: 1, truncated: false, html: `<html><body>${body}</body></html>` });
+    const base = ctxFor("good");
+    const lorem = await runCheck("no_placeholder_text", {}, { ...base, page: page("<h2>Services</h2><p>Lorem ipsum dolor sit amet.</p>") });
+    expect(lorem.status).toBe("fail");
+    expect(lorem.evidence).toMatch(/^Placeholder text left in: Lorem ipsum/);
+    expect((await runCheck("no_placeholder_text", {}, base)).status).toBe("pass");
+  });
+
   it("finds missing phrases and broken links", async () => {
     const ctx = ctxFor("good");
     const text = await runCheck("has_text", { phrases: ["Hackney", "Camden"] }, ctx);
@@ -102,6 +111,12 @@ describe("measured checks on the demo sites", () => {
     const ctx: CheckContext = { ...ctxFor("good"), page: null, fetchError: "The page took too long to respond." };
     expect(await runCheck("http_ok", {}, ctx)).toMatchObject({ status: "fail", evidence: "The page took too long to respond." });
     expect((await runCheck("has_h1", {}, ctx)).status).toBe("fail");
+  });
+
+  it("doesn't fail a delivery when the page was unreachable for network reasons", async () => {
+    const ctx: CheckContext = { ...ctxFor("good"), page: null, unreachable: true, fetchError: "Couldn't look up example.com (ENOTFOUND)." };
+    expect((await runCheck("http_ok", {}, ctx)).status).toBe("error");
+    expect((await runCheck("has_h1", {}, ctx)).status).toBe("error");
   });
 
   it("requires HTTPS", async () => {

@@ -20,8 +20,8 @@ export interface JsonRequest<T> extends CompletionRequest {
   task: string;
   /** Validates the parsed answer. Only valid answers are returned or cached. */
   validate: z.ZodType<T>;
-  /** Reuse an identical earlier answer. Default true. */
-  cache?: boolean;
+  /** Reuse an identical earlier answer (default true). "refresh": ask the model again and replace the cached answer. */
+  cache?: boolean | "refresh";
 }
 
 export interface JsonResult<T> {
@@ -46,8 +46,9 @@ const dbCache: LlmCache = {
     const [hit] = await db.select().from(schema.llmCache).where(eq(schema.llmCache.key, key));
     return hit ? { model: hit.model, response: hit.response } : null;
   },
-  async set(key, model, response) {
-    await db.insert(schema.llmCache).values({ key, model, response: response as object }).onConflictDoNothing();
+  async set(key, model, response, replace) {
+    const q = db.insert(schema.llmCache).values({ key, model, response: response as object });
+    await (replace ? q.onConflictDoUpdate({ target: schema.llmCache.key, set: { model, response: response as object, createdAt: new Date() } }) : q.onConflictDoNothing());
   },
 };
 
@@ -101,9 +102,10 @@ export async function generateJson<T>(req: JsonRequest<T>, deps?: Partial<LlmDep
   const list = deps?.providers ?? defaultProviders();
   const cache = deps && "cache" in deps ? deps.cache : dbCache;
   const promptHash = requestHash(req);
-  const useCache = (req.cache ?? true) && cache !== null;
+  const refresh = req.cache === "refresh";
+  const useCache = (req.cache ?? true) !== false && cache !== null;
 
-  if (useCache) {
+  if (useCache && !refresh) {
     const hit = await cache!.get(promptHash);
     const parsed = hit ? req.validate.safeParse(hit.response) : null;
     if (hit && parsed?.success) return { data: parsed.data, model: hit.model, provider: "cache", promptHash, cached: true };
@@ -117,7 +119,7 @@ export async function generateJson<T>(req: JsonRequest<T>, deps?: Partial<LlmDep
     try {
       const parsed = req.validate.safeParse(JSON.parse(out.text));
       if (parsed.success) {
-        if (useCache) await cache!.set(promptHash, out.model, parsed.data);
+        if (useCache) await cache!.set(promptHash, out.model, parsed.data, refresh);
         return { data: parsed.data, model: out.model, provider: out.provider, promptHash, cached: false };
       }
       problem = parsed.error.message.slice(0, 800);

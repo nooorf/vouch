@@ -25,6 +25,8 @@ export function describeCriterion(c: Criterion): string {
       return `A form with the fields ${list(p.fields)}`;
     case "has_text":
       return `The page mentions ${list(p.phrases)}`;
+    case "no_placeholder_text":
+      return "No leftover placeholder text (Lorem ipsum and the like)";
     case "links_ok":
       return "Internal links work (up to 10 checked)";
     case "page_weight":

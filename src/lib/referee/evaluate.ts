@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { describeCriterion } from "@/lib/brief/describe";
-import type { JudgedCriterion } from "@/lib/brief/schema";
+import type { Criterion, JudgedCriterion } from "@/lib/brief/schema";
 import { env } from "@/lib/env";
 import { registerTask } from "@/lib/jobs/tasks";
 import { LlmUnavailableError } from "@/lib/llm";
@@ -66,6 +66,69 @@ export function toResults(criteria: typeof schema.milestones.$inferSelect["crite
   });
 }
 
+export interface AssessInput {
+  url: string;
+  repoUrl?: string | null;
+  criteria: Criterion[];
+  fundedAt?: Date | null;
+  milestoneAmountCents: number;
+  alreadyReleasedCents: number;
+  objection?: { criterionIds: string[]; note: string } | null;
+}
+
+export interface Assessment {
+  report: RefereeReport;
+  judged: JudgeOutput | null;
+  judgeError: string | null;
+  results: RecordedResult[];
+  verdict: Evaluation;
+}
+
+/**
+ * Measure, judge and score a delivery. No database writes: production (evaluateDelivery) and the
+ * real-world benchmark run exactly this.
+ */
+export async function assessDelivery(input: AssessInput): Promise<Assessment> {
+  const judgedCriteria = input.criteria.filter((c): c is JudgedCriterion => c.kind === "judged");
+  const report = await runReferee({
+    url: input.url,
+    repoUrl: input.repoUrl,
+    criteria: input.criteria,
+    fundedAt: input.fundedAt,
+    wantScreenshot: judgedCriteria.some((c) => c.visual),
+  });
+
+  let judged: JudgeOutput | null = null;
+  let judgeError: string | null = null;
+  if (judgedCriteria.length && report.page) {
+    try {
+      judged = await judge({
+        criteria: judgedCriteria,
+        url: report.page.finalUrl,
+        title: report.page.title,
+        pageText: report.pageText,
+        facts: report.checks.map((c) => `${c.label}: ${c.status} (${c.evidence})`),
+        screenshot: report.screenshot,
+        objection: input.objection ?? null,
+      });
+    } catch (err) {
+      if (!(err instanceof LlmUnavailableError)) throw err;
+      judgeError = err.message;
+    }
+  } else if (judgedCriteria.length) {
+    judgeError = "the page couldn't be loaded";
+  }
+
+  const results = toResults(input.criteria, report, judged, judgeError);
+  const verdict = evaluate({
+    milestoneAmountCents: input.milestoneAmountCents,
+    alreadyReleasedCents: input.alreadyReleasedCents,
+    results,
+    suspicious: report.suspicious.flagged,
+  });
+  return { report, judged, judgeError, results, verdict };
+}
+
 function reviewWindowSeconds(job: typeof schema.jobs.$inferSelect) {
   return job.isDemo ? env().DEMO_REVIEW_WINDOW_SECONDS : job.reviewWindowSeconds;
 }
@@ -85,42 +148,14 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
 
   await db.update(schema.evaluations).set({ status: "running" }).where(eq(schema.evaluations.id, evaluationId));
 
-  const judgedCriteria = milestone.criteria.filter((c): c is JudgedCriterion => c.kind === "judged");
-  const report = await runReferee({
+  const { report, judged, judgeError, results, verdict } = await assessDelivery({
     url: delivery.url,
     repoUrl: delivery.repoUrl,
     criteria: milestone.criteria,
     fundedAt: job.authorizedAt,
-    wantScreenshot: judgedCriteria.some((c) => c.visual),
-  });
-
-  let judged: JudgeOutput | null = null;
-  let judgeError: string | null = null;
-  if (judgedCriteria.length && report.page) {
-    try {
-      judged = await judge({
-        criteria: judgedCriteria,
-        url: report.page.finalUrl,
-        title: report.page.title,
-        pageText: report.pageText,
-        facts: report.checks.map((c) => `${c.label}: ${c.status} (${c.evidence})`),
-        screenshot: report.screenshot,
-        objection: evaluation.kind === "reevaluation" ? { criterionIds: milestone.disputedCriteria ?? [], note: milestone.disputeNote ?? "" } : null,
-      });
-    } catch (err) {
-      if (!(err instanceof LlmUnavailableError)) throw err;
-      judgeError = err.message;
-    }
-  } else if (judgedCriteria.length) {
-    judgeError = "the page couldn't be loaded";
-  }
-
-  const results = toResults(milestone.criteria, report, judged, judgeError);
-  const verdict: Evaluation = evaluate({
     milestoneAmountCents: milestone.amountCents,
     alreadyReleasedCents: milestone.releasedCents,
-    results,
-    suspicious: report.suspicious.flagged,
+    objection: evaluation.kind === "reevaluation" ? { criterionIds: milestone.disputedCriteria ?? [], note: milestone.disputeNote ?? "" } : null,
   });
 
   const { screenshot: _s, pageText: _t, ...reportForStorage } = report;

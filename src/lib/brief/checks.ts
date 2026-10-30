@@ -76,6 +76,13 @@ export const CHECKS = {
     params: z.object({ phrases: z.array(z.string().min(1).max(60)).min(1).max(10) }),
     fields: [{ key: "phrases", type: "list", label: "Phrases", placeholder: "wholesale, opening hours" }],
   },
+  no_placeholder_text: {
+    label: "No placeholder text",
+    help: "The page has no leftover template text such as Lorem ipsum or “Project Name”.",
+    group: "page",
+    params: z.object({}),
+    fields: [],
+  },
   links_ok: {
     label: "Links work",
     help: "Up to 10 internal links return 200.",
@@ -151,6 +158,7 @@ export const DEFAULT_PARAMS: Record<CheckId, Record<string, unknown>> = {
   img_alt_ratio: { minRatio: 0.9 },
   has_form: { fields: ["name", "email", "message"] },
   has_text: { phrases: [] },
+  no_placeholder_text: {},
   links_ok: {},
   page_weight: { maxKb: 500 },
   lighthouse_a11y: { min: 90 },

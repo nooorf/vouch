@@ -3,7 +3,7 @@ import type { Criterion } from "@/lib/brief/schema";
 import { env } from "@/lib/env";
 import type { CheckContext, CheckOutcome } from "./checks";
 import { runCheck } from "./checks";
-import { safeFetch, type FetchOptions } from "./fetch";
+import { FetchBlockedError, safeFetch, type FetchOptions } from "./fetch";
 import { readRepo, type RepoOutcome } from "./github";
 import { parsePage, type Page } from "./page";
 import { runPageSpeed, type PageSpeedOutcome } from "./pagespeed";
@@ -39,6 +39,18 @@ export interface RunInput {
   wantScreenshot?: boolean;
 }
 
+/** Network-level failures (DNS, resets) can be ours: try up to 3 times before giving up. */
+async function fetchWithRetry(url: string, opts: FetchOptions) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await safeFetch(url, opts);
+    } catch (err) {
+      if (!(err instanceof FetchBlockedError) || err.kind !== "network" || attempt >= 3) throw err;
+      await new Promise((r) => setTimeout(r, attempt * 1500));
+    }
+  }
+}
+
 const once = <T>(fn: () => Promise<T>) => {
   let p: Promise<T> | null = null;
   return () => (p ??= fn());
@@ -52,11 +64,18 @@ export async function runReferee(input: RunInput): Promise<RefereeReport> {
 
   let page: Page | null = null;
   let fetchError: string | null = null;
+  let unreachable = false;
   try {
-    const res = await safeFetch(input.url, fetchOpts);
+    let res = await fetchWithRetry(input.url, fetchOpts);
+    // One slow sample can be a network blip: measure once more and keep the faster load.
+    if (res.ms > 5000) {
+      const again = await safeFetch(input.url, fetchOpts).catch(() => null);
+      if (again && again.ms < res.ms) res = again;
+    }
     page = parsePage({ url: input.url, finalUrl: res.finalUrl, status: res.status, ms: res.ms, bytes: res.bytes, truncated: res.truncated, html: res.body });
   } catch (err) {
     fetchError = err instanceof Error ? err.message : String(err);
+    unreachable = err instanceof FetchBlockedError && err.kind === "network";
   }
 
   const checks = input.criteria.filter((c) => c.kind === "check");
@@ -67,6 +86,7 @@ export async function runReferee(input: RunInput): Promise<RefereeReport> {
   const ctx: CheckContext = {
     page,
     fetchError: fetchError ?? undefined,
+    unreachable,
     allowHttp: allowLocal,
     fetchUrl: async (url, method = "GET") => {
       const r = await safeFetch(url, { ...fetchOpts, method, maxBytes: 512 * 1024, timeoutMs: 8000 });

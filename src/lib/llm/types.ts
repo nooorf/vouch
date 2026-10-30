@@ -44,5 +44,6 @@ export class LlmUnavailableError extends Error {
 /** Where validated answers are kept, keyed by a hash of the request. */
 export interface LlmCache {
   get(key: string): Promise<{ model: string; response: unknown } | null>;
-  set(key: string, model: string, response: unknown): Promise<void>;
+  /** Store an answer; `replace` overwrites an existing one. */
+  set(key: string, model: string, response: unknown, replace?: boolean): Promise<void>;
 }

@@ -23,9 +23,11 @@ export interface Suite<I, O> {
   name: string;
   run: (input: I, opts: { fresh: boolean }) => Promise<{ output: O; meta?: Record<string, unknown> }>;
   cases: EvalCase<I, O>[];
+  /** Called once with every case's result, e.g. to write a scorecard. */
+  afterAll?: (results: CaseResult[]) => void;
 }
 
-interface CaseResult {
+export interface CaseResult {
   id: string;
   ms: number;
   scores: Score[];
@@ -65,6 +67,8 @@ export async function runSuite<I, O>(suite: Suite<I, O>, opts: { fresh: boolean;
   const passed = results.reduce((n, r) => n + r.scores.filter((s) => s.pass).length, 0);
   const errors = results.filter((r) => r.error).length;
   console.log(`\n${passed}/${total} checks passed${errors ? `, ${errors} case(s) errored` : ""}`);
+
+  suite.afterAll?.(results);
 
   mkdirSync("evals/results", { recursive: true });
   const file = `evals/results/${suite.name}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
