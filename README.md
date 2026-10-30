@@ -12,6 +12,7 @@ Day 1. Done so far:
 
 - `src/lib/policy/`: the policy engine (verdicts, partial releases, review window, capture guards), with tests.
 - `src/lib/brief/`: the brief schema, check library, agreement hash and demo brief, with tests.
+- `src/db/`: Postgres schema (Drizzle) for jobs, brief versions, milestones, evaluations, payments, the event ledger and a task queue; migrations in `drizzle/`.
 - `scripts/smoke.ts`: PayPal sandbox smoke test (authorize, two partial captures, idempotent retry, void, refund).
 
 ## Run it
@@ -19,6 +20,8 @@ Day 1. Done so far:
 ```bash
 npm install
 cp .env.example .env.local   # fill in the PayPal sandbox values
+npm run db:migrate           # create the tables on your Neon database
+npm run db:check             # verify the connection and constraints (rolls back)
 npm test                     # policy and schema tests
 npm run smoke                # PayPal sandbox smoke test (opens an approval link)
 npm run smoke -- --payee     # same, paying a second sandbox account as the freelancer
