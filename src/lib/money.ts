@@ -10,20 +10,29 @@ export function formatCents(cents: number): string {
 export interface MoneySplit {
   releasedCents: number;
   heldCents: number;
+  /** Authorized but never captured, and released back to the client (voided). */
+  returnedCents: number;
   /** Agreed but not (yet) authorized by the client. */
   unfundedCents: number;
   totalCents: number;
 }
 
-/** Split a job total into the three money-bar segments. Clamps so segments always add up. */
-export function splitMoney(p: { totalCents: number; authorizedCents: number; releasedCents: number }): MoneySplit {
+/** Split a job total into the money-bar segments. Clamps so segments always add up. */
+export function splitMoney(p: { totalCents: number; authorizedCents: number; releasedCents: number; returnedCents?: number }): MoneySplit {
   const total = Math.max(0, p.totalCents);
   const released = Math.min(Math.max(0, p.releasedCents), total);
   const authorized = Math.min(Math.max(p.authorizedCents, released), total);
+  const returned = Math.min(Math.max(0, p.returnedCents ?? 0), authorized - released);
   return {
     releasedCents: released,
-    heldCents: authorized - released,
+    heldCents: authorized - released - returned,
+    returnedCents: returned,
     unfundedCents: total - authorized,
     totalCents: total,
   };
+}
+
+/** What went back to the client: on a completed job, everything authorized but not captured was voided. */
+export function returnedCents(job: { status: string; authorizedCents: number; capturedCents: number }): number {
+  return job.status === "COMPLETED" ? Math.max(0, job.authorizedCents - job.capturedCents) : 0;
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  statusAfterRelease,
+  targetForChoice,
   assertCaptureAllowed,
   captureRequestId,
   evaluate,
@@ -166,6 +168,25 @@ describe("resolveWindow", () => {
       .toMatchObject({ action: "capture", amountCents: 6000 });
     expect(resolveWindow({ ...w, alreadyReleasedCents: 9000, evaluation: partial, clientAction: { type: "decide", releaseTotalCents: 5000 } }).action)
       .toBe("hold");
+  });
+});
+
+describe("statusAfterRelease and targetForChoice", () => {
+  it("names the milestone state from its released total", () => {
+    expect(statusAfterRelease(21000, 21000)).toBe("RELEASED");
+    expect(statusAfterRelease(21000, 18000)).toBe("PARTIAL_HELD");
+    expect(statusAfterRelease(21000, 0)).toBe("HELD");
+  });
+
+  it("turns a client choice into a released total, never clawing back or overpaying", () => {
+    const p = { amountCents: 21000, releasedCents: 6000, earnedCents: 18000, silenceReleaseCents: 4000 };
+    expect(targetForChoice("release_all", p)).toBe(21000);
+    expect(targetForChoice("release_earned", p)).toBe(18000);
+    expect(targetForChoice("release_measured", p)).toBe(10000);
+    expect(targetForChoice("hold", p)).toBe(6000);
+    expect(targetForChoice("close", p)).toBe(6000);
+    expect(targetForChoice("release_earned", { ...p, earnedCents: 1000 })).toBe(6000);
+    expect(targetForChoice("release_measured", { ...p, silenceReleaseCents: 99999 })).toBe(21000);
   });
 });
 

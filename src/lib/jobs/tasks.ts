@@ -7,7 +7,7 @@ import { db, schema, type Tx } from "@/db";
  * restarted mid-way. Claiming is atomic, so two runners never do the same task.
  */
 
-export type TaskKind = "evaluate";
+export type TaskKind = "evaluate" | "settle";
 type Task = typeof schema.tasks.$inferSelect;
 
 const MAX_ATTEMPTS = 3;
@@ -21,11 +21,9 @@ export function registerTask(kind: TaskKind, run: Handler, onFinalFailure?: Fina
   handlers.set(kind, { run, onFinalFailure });
 }
 
-export async function enqueue(tx: Tx, kind: TaskKind, refId: string, jobId: string) {
-  await tx
-    .insert(schema.tasks)
-    .values({ kind, refId, payload: { jobId }, dedupeKey: `${kind}:${refId}` })
-    .onConflictDoNothing();
+/** Queue work once: the same dedupe key (default kind:refId) is never queued twice. */
+export async function enqueue(tx: Tx | typeof db, kind: TaskKind, refId: string, jobId: string, dedupeKey = `${kind}:${refId}`) {
+  await tx.insert(schema.tasks).values({ kind, refId, payload: { jobId }, dedupeKey }).onConflictDoNothing();
 }
 
 async function claim(id: string): Promise<Task | null> {

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { describeCriterion } from "@/lib/brief/describe";
 import type { JudgedCriterion } from "@/lib/brief/schema";
@@ -105,6 +105,7 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
         pageText: report.pageText,
         facts: report.checks.map((c) => `${c.label}: ${c.status} (${c.evidence})`),
         screenshot: report.screenshot,
+        objection: evaluation.kind === "reevaluation" ? { criterionIds: milestone.disputedCriteria ?? [], note: milestone.disputeNote ?? "" } : null,
       });
     } catch (err) {
       if (!(err instanceof LlmUnavailableError)) throw err;
@@ -151,20 +152,22 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
         finishedAt: now,
       })
       .where(eq(schema.evaluations.id, evaluationId));
+    const recheck = evaluation.kind === "reevaluation";
     await tx
       .update(schema.milestones)
       .set({
-        status: "REVIEW_WINDOW",
+        // After a dispute's re-check the client decides; if they stay silent, the re-check's verdict executes.
+        status: recheck ? "DISPUTED" : "REVIEW_WINDOW",
         currentEvaluationId: evaluationId,
         reviewEndsAt: new Date(now.getTime() + reviewWindowSeconds(job) * 1000),
         windowExtended: false,
-        reevaluated: false,
+        reevaluated: recheck,
       })
       .where(eq(schema.milestones.id, milestone.id));
     await tx.insert(schema.events).values({
       jobId: job.id,
       milestoneId: milestone.id,
-      type: "evaluation.completed",
+      type: recheck ? "evaluation.rechecked" : "evaluation.completed",
       source: "ai",
       payload: {
         position: milestone.position,
@@ -185,6 +188,25 @@ async function evaluationFailed(evaluationId: string, error: string) {
   const [ev] = await db.select().from(schema.evaluations).where(eq(schema.evaluations.id, evaluationId));
   if (!ev || ev.status === "done") return;
   const [m] = await db.select().from(schema.milestones).where(eq(schema.milestones.id, ev.milestoneId));
+  if (ev.kind === "reevaluation" && m) {
+    // The re-check failed: the client decides on the original evidence.
+    const [original] = await db
+      .select()
+      .from(schema.evaluations)
+      .where(and(eq(schema.evaluations.milestoneId, m.id), eq(schema.evaluations.kind, "initial"), eq(schema.evaluations.status, "done")))
+      .orderBy(desc(schema.evaluations.createdAt))
+      .limit(1);
+    const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, m.jobId));
+    await db.transaction(async (tx) => {
+      await tx.update(schema.evaluations).set({ status: "error", error: error.slice(0, 1000), finishedAt: new Date() }).where(eq(schema.evaluations.id, evaluationId));
+      await tx
+        .update(schema.milestones)
+        .set({ currentEvaluationId: original?.id ?? m.currentEvaluationId, reevaluated: true, reviewEndsAt: new Date(Date.now() + reviewWindowSeconds(job) * 1000) })
+        .where(eq(schema.milestones.id, m.id));
+      await tx.insert(schema.events).values({ jobId: m.jobId, milestoneId: m.id, type: "evaluation.failed", source: "system", payload: { position: m.position, error: error.slice(0, 300), recheck: true } });
+    });
+    return;
+  }
   await db.transaction(async (tx) => {
     await tx.update(schema.evaluations).set({ status: "error", error: error.slice(0, 1000), finishedAt: new Date() }).where(eq(schema.evaluations.id, evaluationId));
     if (m) {

@@ -286,6 +286,42 @@ export function assertCaptureAllowed(p: {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Milestone status after money moves                                   */
+/* ------------------------------------------------------------------ */
+
+export type SettledStatus = "RELEASED" | "PARTIAL_HELD" | "HELD";
+
+/** Where a milestone stands once its released total is known. */
+export function statusAfterRelease(amountCents: number, releasedCents: number): SettledStatus {
+  if (releasedCents >= amountCents) return "RELEASED";
+  return releasedCents > 0 ? "PARTIAL_HELD" : "HELD";
+}
+
+export type ClientChoice = "release_all" | "release_earned" | "release_measured" | "hold" | "close";
+
+/**
+ * The released total a client's choice leads to, from server-side numbers only.
+ * Never below what's already released (money isn't clawed back) or above the milestone.
+ */
+export function targetForChoice(
+  choice: ClientChoice,
+  p: { amountCents: number; releasedCents: number; earnedCents: number | null; silenceReleaseCents: number | null },
+): number {
+  const clamp = (v: number) => Math.min(p.amountCents, Math.max(p.releasedCents, v));
+  switch (choice) {
+    case "release_all":
+      return p.amountCents;
+    case "release_earned":
+      return clamp(p.earnedCents ?? p.releasedCents);
+    case "release_measured":
+      return clamp(p.releasedCents + (p.silenceReleaseCents ?? 0));
+    case "hold":
+    case "close":
+      return p.releasedCents;
+  }
+}
+
 /**
  * PayPal-Request-Id for a milestone capture. `seq` is how many captures this milestone already
  * has. Write the pending payment row with this id before calling PayPal, so a retry after a

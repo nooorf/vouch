@@ -57,6 +57,16 @@ async function clickByText(page: Page, selector: string, text: string) {
   await (handle.asElement() as unknown as { click: () => Promise<void> }).click();
 }
 
+async function clickContaining(page: Page, selector: string, text: string) {
+  const handle = await page.waitForFunction(
+    (sel, t) => [...document.querySelectorAll<HTMLElement>(sel)].find((el) => el.textContent?.includes(t) && !(el as HTMLButtonElement).disabled),
+    { timeout: 30_000 },
+    selector,
+    text,
+  );
+  await (handle.asElement() as unknown as { click: () => Promise<void> }).click();
+}
+
 async function shot(page: Page, name: string) {
   if (!SHOTS) return;
   if (!existsSync(SHOTS)) mkdirSync(SHOTS, { recursive: true });
@@ -347,8 +357,53 @@ async function main() {
         await nav(() => clickByText(page, "a", "Client"));
         await page.waitForFunction(() => /Passed|Partly met|Not met|Needs a person/.test(document.body.innerText), { timeout: 30_000 });
         await text("M1 delivery");
-        await nav(() => clickByText(page, "a", "Freelancer"));
       });
+
+      await step("Silence rule: the review window closes and PayPal releases what was earned", async () => {
+        // Demo review windows are short; with no client action, the verdict executes.
+        await text("Released to Sam Rivera", 120_000);
+        await text("stays held until a fix is accepted");
+      });
+      await shot(page, "silence-release");
+
+      await step("Freelancer resubmits M1 with a GitHub repo and it passes", async () => {
+        await nav(() => clickByText(page, "a", "Freelancer"));
+        await clickByText(page, "button", "Good site");
+        await page.type("#delivery-repo", "https://github.com/sindresorhus/is");
+        await clickByText(page, "button", "Resubmit for checking");
+        await page.waitForFunction(() => /attempt 2 of/.test(document.body.innerText) && /Passed/.test(document.body.innerText) && !document.body.innerText.includes("Checking the delivery"), { timeout: 180_000 });
+      });
+
+      await step("Client disputes, the AI re-checks, and the client releases what it earned", async () => {
+        await nav(() => clickByText(page, "a", "Client"));
+        await clickByText(page, "button", "Dispute this result");
+        await page.click('form input[type="checkbox"]');
+        await page.type("textarea[id^='note-']", "The README check should only count if the repository is the site's own code.");
+        await clickByText(page, "button", "Dispute and re-check");
+        await text("The AI is checking the delivery again", 30_000).catch(() => undefined);
+        await text("The client disputed the result and the AI checked again", 180_000);
+        await clickContaining(page, "button", "Release");
+        await text("Released in full", 60_000);
+      });
+      await shot(page, "dispute-released");
+
+      await step("M2: the flawed site fails a must-pass check and silence holds the money", async () => {
+        await nav(() => clickByText(page, "a", "Freelancer"));
+        await clickByText(page, "button", "Flawed site");
+        await clickByText(page, "button", "Submit for checking");
+        await page.waitForFunction(() => /M2 delivery/.test(document.body.innerText) && /Not met|Needs a person|Partly met/.test(document.body.innerText) && !document.body.innerText.includes("Checking the delivery"), { timeout: 180_000 });
+        await nav(() => clickByText(page, "a", "Client"));
+        await text("Nothing released yet", 120_000);
+      });
+
+      await step("Client closes M2: the job completes and the unused hold goes back", async () => {
+        await clickContaining(page, "button", "Close this milestone");
+        await text("Receipt", 60_000);
+        await text("Unused hold released back to the client");
+        await text("Done.");
+      });
+      await shot(page, "receipt");
+      await nav(() => clickByText(page, "a", "Freelancer"));
     }
 
     await step("The agreed brief is locked", async () => {
@@ -359,7 +414,7 @@ async function main() {
 
     await step("Dashboard lists the job", async () => {
       await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle0" });
-      await text(buyerEmail && buyerPassword ? "funded" : "agreed");
+      await text(buyerEmail && buyerPassword ? "completed" : "agreed");
     });
 
     if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);

@@ -1,8 +1,9 @@
-import { and, eq, isNotNull, lt, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { hasFeature } from "@/lib/env";
 import { paypal, paypalErrorInfo } from "@/lib/paypal/client";
 import { completeFunding } from "@/lib/paypal/funding";
+import { completeIfDone, queueExpiredWindows, recoverPendingCaptures } from "./settle";
 import { assertTransition } from "./status";
 
 /**
@@ -41,15 +42,31 @@ export async function tickJob(jobId: string): Promise<string[]> {
       if (expired) done.push("expired");
     }
   }
+  if (job.status === "FUNDED" || job.status === "IN_PROGRESS") {
+    // Closed review windows become "settle" tasks (run right after the response, or by the cron).
+    const queued = await queueExpiredWindows(job.id);
+    if (queued) done.push(`queued ${queued} settlement(s)`);
+    if (hasFeature("paypal")) {
+      const recovered = await recoverPendingCaptures(job.id).catch(() => 0);
+      if (recovered) done.push(`recovered ${recovered} capture(s)`);
+      await completeIfDone(job.id).catch((err) => console.warn("[tick] complete check failed", job.id, err));
+    }
+  }
   return done;
 }
 
 /** Jobs that may need a tick: agreed but unfunded (pending checkout or past the funding deadline). */
 export async function dueJobIds(limit = 50): Promise<string[]> {
-  const rows = await db
+  const unfunded = await db
     .select({ id: schema.jobs.id })
     .from(schema.jobs)
     .where(and(eq(schema.jobs.status, "AGREED"), or(isNotNull(schema.jobs.paypalOrderId), lt(schema.jobs.fundingExpiresAt, new Date()))))
     .limit(limit);
-  return rows.map((r) => r.id);
+  // Jobs with a review or decision window that has closed.
+  const windows = await db
+    .selectDistinct({ id: schema.milestones.jobId })
+    .from(schema.milestones)
+    .where(and(inArray(schema.milestones.status, ["REVIEW_WINDOW", "DISPUTED"]), lt(schema.milestones.reviewEndsAt, new Date())))
+    .limit(limit);
+  return [...new Set([...unfunded, ...windows].map((r) => r.id))];
 }

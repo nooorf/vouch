@@ -3,6 +3,7 @@ import { formatCents } from "@/lib/money";
 import type { Verdict } from "@/lib/policy/policy";
 import type { Measurements, RecordedResult } from "@/lib/referee/evaluate";
 import { AutoRefresh } from "./auto-refresh";
+import { Countdown } from "./countdown";
 import { Badge, Card } from "./ui";
 
 type Evaluation = typeof schema.evaluations.$inferSelect;
@@ -19,17 +20,61 @@ const verdictView: Record<Verdict, { label: string; tone: "brand" | "held" | "da
 const when = (d: Date | null) => (d ? d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC" : "");
 
 function MoneyOutcome({ ev, m, freelancer }: { ev: Evaluation; m: Milestone; freelancer: string }) {
-  const held = m.amountCents - m.releasedCents - (ev.releaseNowCents ?? 0);
-  if (m.status !== "REVIEW_WINDOW") return null;
-  let text: string;
-  if (ev.verdict === "NEEDS_HUMAN") {
-    text = `The client decides. If they don't respond by ${when(m.reviewEndsAt)}, the window is extended once; after that ${formatCents(ev.silenceReleaseCents ?? 0)} (the share backed by passing measured checks) is released.`;
-  } else if ((ev.releaseNowCents ?? 0) > 0) {
-    text = `${formatCents(ev.releaseNowCents!)} is released to ${freelancer} when the review window closes (${when(m.reviewEndsAt)}), unless the client disputes it.${held > 0 ? ` ${formatCents(held)} stays held until a fix is accepted.` : ""}`;
-  } else {
-    text = `Nothing is released. ${formatCents(held)} stays held until a fix is accepted.`;
+  const remaining = m.amountCents - m.releasedCents;
+  const endsAt = m.reviewEndsAt ? <Countdown endsAt={m.reviewEndsAt.toISOString()} /> : null;
+  let body: React.ReactNode = null;
+
+  if (m.status === "REVIEW_WINDOW") {
+    if (ev.verdict === "NEEDS_HUMAN") {
+      body = (
+        <>
+          The client decides. If they don&apos;t within {endsAt}, the window is extended once; after that {formatCents(ev.silenceReleaseCents ?? 0)} (the share backed
+          by passing measured checks) is released.
+        </>
+      );
+    } else if ((ev.releaseNowCents ?? 0) > 0) {
+      const held = remaining - (ev.releaseNowCents ?? 0);
+      body = (
+        <>
+          {formatCents(ev.releaseNowCents!)} is released to {freelancer} in {endsAt} unless the client approves sooner or disputes it.
+          {held > 0 ? ` ${formatCents(held)} stays held until a fix is accepted.` : ""}
+        </>
+      );
+    } else {
+      body = <>Nothing is released. {formatCents(remaining)} stays held until a fix is accepted (window closes in {endsAt}).</>;
+    }
+  } else if (m.status === "DISPUTED") {
+    body =
+      ev.status === "done" && m.reevaluated ? (
+        <>
+          The client disputed the result and the AI checked again. The client decides within {endsAt}; if they don&apos;t,{" "}
+          {ev.verdict === "NEEDS_HUMAN"
+            ? `${formatCents(ev.silenceReleaseCents ?? 0)} (backed by measured checks) is released.`
+            : (ev.releaseNowCents ?? 0) > 0
+              ? `${formatCents(ev.releaseNowCents!)} is released.`
+              : "nothing more is released."}
+        </>
+      ) : (
+        <>The client disputed the result. The AI is checking the delivery again with their objection in mind.</>
+      );
+  } else if (m.status === "RELEASED") {
+    body = <>Released in full: {formatCents(m.releasedCents)} paid to {freelancer}.</>;
+  } else if (m.status === "PARTIAL_HELD") {
+    body = <>{formatCents(m.releasedCents)} released; {formatCents(remaining)} stays held until a fix is accepted or the client releases it.</>;
+  } else if (m.status === "HELD") {
+    body = <>Nothing released yet; {formatCents(remaining)} stays held until a fix is accepted or the client releases it.</>;
+  } else if (m.status === "CLOSED") {
+    body = <>Closed by the client: {formatCents(m.releasedCents)} released; {formatCents(remaining)} goes back to the client.</>;
   }
-  return <p className="rounded-lg bg-surface-2 px-4 py-3 text-sm">{text}</p>;
+  if (!body) return null;
+  const watching = (m.status === "REVIEW_WINDOW" || m.status === "DISPUTED") && m.reviewEndsAt;
+  return (
+    <div className="rounded-lg bg-surface-2 px-4 py-3 text-sm">
+      {/* Start refreshing a little before the window closes, so the release shows up on its own. */}
+      {watching && <AutoRefresh seconds={4} from={new Date(m.reviewEndsAt!.getTime() - 60_000).toISOString()} />}
+      {body}
+    </div>
+  );
 }
 
 function ResultRow({ r, valueCents }: { r: RecordedResult; valueCents: number }) {
@@ -86,6 +131,7 @@ export function EvaluationCard({
       <div className="min-w-0">
         <p className="text-sm text-muted">
           M{m.position} delivery · attempt {delivery.attemptNo} of {maxAttempts}
+          {ev.kind === "reevaluation" ? " · re-check after the client's dispute" : ""}
         </p>
         <a href={delivery.url} target="_blank" rel="noopener noreferrer" className="block truncate font-medium text-brand hover:underline">
           {delivery.url}
@@ -102,7 +148,9 @@ export function EvaluationCard({
         <AutoRefresh seconds={3} />
         <p className="mt-4 flex items-center gap-2 text-sm">
           <span className="size-2 animate-pulse rounded-full bg-held" aria-hidden="true" />
-          Checking the delivery: loading the page, running the measured checks and Google Lighthouse, then the AI judge. Usually under a minute.
+          {ev.kind === "reevaluation"
+            ? "Re-checking the delivery with the client's objection: measured checks again, then the AI judge. Usually under a minute."
+            : "Checking the delivery: loading the page, running the measured checks and Google Lighthouse, then the AI judge. Usually under a minute."}
         </p>
       </Card>
     );
@@ -131,6 +179,9 @@ export function EvaluationCard({
       {header}
       <div className="mt-4 space-y-3">
         <MoneyOutcome ev={ev} m={m} freelancer={freelancer} />
+        {ev.kind === "reevaluation" && m.disputeNote && (
+          <blockquote className="border-l-2 border-info/50 pl-3 text-sm text-muted">Client&apos;s objection: “{m.disputeNote}”</blockquote>
+        )}
         {ev.reasons && ev.reasons.length > 0 && (
           <ul className="space-y-1 text-sm text-muted">
             {ev.reasons.map((r) => (

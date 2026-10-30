@@ -48,6 +48,22 @@ function describe(e: Event): string {
       return `checked M${p.position}: ${String(p.verdict).replace("_", " ").toLowerCase()}${typeof p.releaseNowCents === "number" && p.releaseNowCents > 0 ? `, ${money(p.releaseNowCents)} to release` : ""}${p.suspicious ? " (flagged: instructions aimed at the AI)" : ""}`;
     case "evaluation.failed":
       return `couldn't finish checking M${p.position}: ${p.error}`;
+    case "payment.captured":
+      return `captured ${money(p.amountCents)}: released to the freelancer`;
+    case "payment.capture_failed":
+      return `couldn't capture ${money(p.amountCents)}${p.issue ? ` (${p.issue})` : ""}; nothing was charged`;
+    case "payment.reauthorized":
+      return `reauthorized the hold for ${money(p.amountCents)} after the 3-day honor period`;
+    case "milestone.settled":
+      return `settled M${p.position} (${String(p.how).replace("client: ", "client chose ").replace(/_/g, " ")}): ${money(p.totalReleasedCents)} released so far`;
+    case "review.extended":
+      return `extended M${p.position}'s review window once, because a person needs to decide`;
+    case "dispute.opened":
+      return `disputed M${p.position}: “${p.note}”`;
+    case "evaluation.rechecked":
+      return `re-checked M${p.position} after the dispute: ${String(p.verdict).replace("_", " ").toLowerCase()}`;
+    case "job.completed":
+      return `completed the job: ${money(p.releasedCents)} released${typeof p.returnedCents === "number" && p.returnedCents > 0 ? `, ${money(p.returnedCents)} returned to the client` : ""}`;
     case "brief.agreed":
       return `accepted brief v${p.version}. Both sides agreed on the same version.`;
     default:

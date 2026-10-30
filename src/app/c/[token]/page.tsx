@@ -7,19 +7,23 @@ import { EvaluationCard } from "@/components/evaluation-card";
 import { JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { MilestoneList } from "@/components/milestones";
 import { MoneyBar } from "@/components/money-bar";
+import { Receipt } from "@/components/receipt";
 import { Badge, Card, Container } from "@/components/ui";
 import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
 import { env, hasFeature } from "@/lib/env";
 import { findJobByClientToken } from "@/lib/jobs/agreement";
 import { drainTasks } from "@/lib/jobs/runner";
+import { choiceViews } from "@/lib/jobs/choice-views";
+import { choicesFor } from "@/lib/jobs/settle";
 import { tickJob } from "@/lib/jobs/tick";
 import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { stepIndex } from "@/lib/jobs/status";
-import { formatCents } from "@/lib/money";
+import { formatCents, returnedCents } from "@/lib/money";
 import { getCurrentUser } from "@/lib/session";
 import { ClientActions } from "./client-actions";
 import { FundCard } from "./fund-card";
+import { ReviewPanel } from "./review-panel";
 
 // The link is the client's key: never leak it to other sites through the Referer header.
 export const metadata: Metadata = { title: "Brief for review", referrer: "no-referrer", robots: { index: false } };
@@ -32,12 +36,13 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
   await tickJob(found.id);
   after(() => drainTasks({ jobId: found.id }).catch((e) => console.error("[client page] drain", e)));
   // Independent reads in parallel: each is a network round trip to the database.
-  const [job, rows, [owner], versions, viewer] = await Promise.all([
+  const [job, rows, [owner], versions, viewer, payments] = await Promise.all([
     findJobByClientToken(token).then((j) => j!),
     milestonesWithEvaluations(found.id),
     db.select().from(schema.users).where(eq(schema.users.id, found.ownerId)),
     db.select().from(schema.briefVersions).where(eq(schema.briefVersions.jobId, found.id)).orderBy(desc(schema.briefVersions.versionNo)),
     getCurrentUser(),
+    db.select().from(schema.payments).where(eq(schema.payments.jobId, found.id)),
   ]);
   const milestones = rows.map((r) => r.m);
   const e = env();
@@ -83,11 +88,25 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
           <MilestoneList milestones={milestones} />
-          {[...rows].reverse().map(({ m, ev, delivery }) =>
-            ev && delivery ? (
-              <EvaluationCard key={ev.id} m={m} ev={ev} delivery={delivery} viewer="client" freelancer={owner?.name ?? "the freelancer"} maxAttempts={1 + job.maxResubmissions} />
-            ) : null,
-          )}
+          {[...rows].reverse().map(({ m, ev, delivery }) => {
+            if (!ev || !delivery) return null;
+            const choices = choicesFor(m, ev, 1 + job.maxResubmissions - m.attempts);
+            const canDispute = m.status === "REVIEW_WINDOW" && !m.reevaluated && ev.status === "done" && ev.verdict !== "NEEDS_HUMAN";
+            return (
+              <div key={ev.id} className="space-y-3">
+                <EvaluationCard m={m} ev={ev} delivery={delivery} viewer="client" freelancer={owner?.name ?? "the freelancer"} maxAttempts={1 + job.maxResubmissions} />
+                {choices.length > 0 && (
+                  <ReviewPanel
+                    token={token}
+                    milestoneId={m.id}
+                    position={m.position}
+                    choices={choiceViews(m, ev, choices)}
+                    dispute={canDispute ? (ev.results ?? []).map((r) => ({ id: r.id, label: r.label, passed: r.passed })) : null}
+                  />
+                )}
+              </div>
+            );
+          })}
           {previous && job.status === "PROPOSED" && <VersionChanges changes={diffBriefs(previous.content, shown.content)} fromVersion={previous.versionNo} />}
           <BriefView brief={shown.content} />
         </div>
@@ -144,13 +163,19 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
             <Card className="p-5">
               <Badge tone="brand">{job.status === "COMPLETED" ? "Completed" : "Funded"}</Badge>
               <p className="mt-3 text-sm">
-                {formatCents(job.authorizedCents)} is held by PayPal. Each milestone is paid only when its delivery passes the agreed checks or you approve
-                it.
+                {job.status === "COMPLETED"
+                  ? `Done. ${formatCents(job.capturedCents)} was paid for the delivered work${job.authorizedCents > job.capturedCents ? ` and ${formatCents(job.authorizedCents - job.capturedCents)} was released back to you` : ""}.`
+                  : `${formatCents(job.authorizedCents)} is held by PayPal. Each milestone is paid only when its delivery passes the agreed checks or you approve it.`}
               </p>
               <div className="mt-4">
-                <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} />
+                <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} returnedCents={returnedCents(job)} />
               </div>
             </Card>
+          )}
+          {payments.length > 0 && (
+            <div className="mt-4">
+              <Receipt payments={payments} milestones={milestones} completed={job.status === "COMPLETED"} freelancer={owner?.name ?? "the freelancer"} />
+            </div>
           )}
           {job.status === "EXPIRED" && (
             <Card className="p-5">

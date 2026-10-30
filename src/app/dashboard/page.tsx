@@ -4,7 +4,7 @@ import Link from "next/link";
 import { MoneyBar } from "@/components/money-bar";
 import { Badge, Card, Container, LinkButton } from "@/components/ui";
 import { db, schema } from "@/db";
-import { formatCents } from "@/lib/money";
+import { formatCents, returnedCents } from "@/lib/money";
 import { requireUser } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -67,7 +67,7 @@ export default async function Dashboard() {
                   </div>
                   <p className="tabular mt-1 font-mono text-sm text-muted">{formatCents(job.totalCents)}</p>
                   <div className="mt-4">
-                    <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} />
+                    <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} returnedCents={returnedCents(job)} />
                   </div>
                 </Card>
               </Link>

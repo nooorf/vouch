@@ -9,6 +9,7 @@ import { EvaluationCard } from "@/components/evaluation-card";
 import { CopyLink, JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { MilestoneList } from "@/components/milestones";
 import { MoneyBar } from "@/components/money-bar";
+import { Receipt } from "@/components/receipt";
 import { Badge, Card, Container, LinkButton } from "@/components/ui";
 import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
@@ -18,7 +19,7 @@ import { canSubmit, currentMilestone } from "@/lib/jobs/delivery";
 import { drainTasks } from "@/lib/jobs/runner";
 import { tickJob } from "@/lib/jobs/tick";
 import { milestonesWithEvaluations } from "@/lib/jobs/views";
-import { formatCents } from "@/lib/money";
+import { formatCents, returnedCents } from "@/lib/money";
 import { requireUser } from "@/lib/session";
 import { ProposalActions } from "./proposal-actions";
 import { SubmitDelivery } from "./submit-delivery";
@@ -36,11 +37,12 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   after(() => drainTasks({ jobId: id }).catch((e) => console.error("[job page] drain", e)));
 
   // Independent reads in parallel: each is a network round trip to the database.
-  const [[job], versions, rows, events] = await Promise.all([
+  const [[job], versions, rows, events, payments] = await Promise.all([
     db.select().from(schema.jobs).where(and(eq(schema.jobs.id, id), eq(schema.jobs.ownerId, user.id))),
     db.select().from(schema.briefVersions).where(eq(schema.briefVersions.jobId, id)).orderBy(desc(schema.briefVersions.versionNo)),
     milestonesWithEvaluations(id),
     db.select().from(schema.events).where(eq(schema.events.jobId, id)).orderBy(desc(schema.events.id)).limit(50),
+    db.select().from(schema.payments).where(eq(schema.payments.jobId, id)),
   ]);
   if (!job) notFound();
   const latest = versions[0];
@@ -121,7 +123,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
             <p className="text-sm text-muted">Total</p>
             <p className="tabular mt-1 font-mono text-3xl font-semibold">{formatCents(job.totalCents)}</p>
             <div className="mt-4">
-              <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} />
+              <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} returnedCents={returnedCents(job)} />
             </div>
           </Card>
 
@@ -161,6 +163,14 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
                 <p className="mt-2 text-sm text-muted">The brief is locked. Waiting for the client to fund the job with PayPal.</p>
               </>
             )}
+            {job.status === "COMPLETED" && (
+              <>
+                <h2 className="font-semibold">Completed</h2>
+                <p className="mt-2 text-sm text-muted">
+                  You were paid {formatCents(job.capturedCents)}.{job.authorizedCents > job.capturedCents ? ` ${formatCents(job.authorizedCents - job.capturedCents)} went back to the client.` : ""}
+                </p>
+              </>
+            )}
             {(job.status === "FUNDED" || job.status === "IN_PROGRESS") && (
               <>
                 <h2 className="font-semibold">Funded</h2>
@@ -182,6 +192,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
             )}
           </Card>
 
+          <Receipt payments={payments} milestones={milestones} completed={job.status === "COMPLETED"} freelancer="you" />
           <Activity events={events} />
         </aside>
       </div>
