@@ -128,9 +128,9 @@ describe("measured checks on the demo sites", () => {
 
   it("measures web-app behaviour in a real browser, and reports 'not measured' without one", async () => {
     const rendered = (over: Partial<RenderedPage>): RenderedPage => ({
-      renderer: "chrome", finalUrl: ORIGIN, status: 200, html: "", ms: 900, pageErrors: [], consoleErrors: [], failedRequests: [], blockedRequests: [],
-      mobile: { width: 390, horizontalOverflow: false, scrollWidth: 390, screenshot: null },
-      desktop: { width: 1366, horizontalOverflow: false, scrollWidth: 1366, screenshot: null },
+      renderer: "chrome", finalUrl: ORIGIN, status: 200, html: "", visibleText: "", hiddenText: [], ms: 900, pageErrors: [], consoleErrors: [], failedRequests: [], blockedRequests: [],
+      mobile: { width: 390, layoutWidth: 390, sidewaysScroll: 0, horizontalOverflow: false, offenders: [], screenshot: null },
+      desktop: { width: 1366, layoutWidth: 1366, sidewaysScroll: 0, horizontalOverflow: false, offenders: [], screenshot: null },
       ...over,
     });
     const base = ctxFor("good");
@@ -140,9 +140,43 @@ describe("measured checks on the demo sites", () => {
     expect((await runCheck("no_js_errors", {}, noisy)).status).toBe("pass");
     const deadApi = { ...base, rendered: rendered({ failedRequests: [{ url: "https://api.example.com/articles", status: null, type: "fetch", reason: "no response after 20 s" }] }) };
     expect((await runCheck("no_failed_requests", {}, deadApi)).evidence).toBe("1 request failed: API call api.example.com/articles (no response after 20 s).");
-    const wide = { ...base, rendered: rendered({ mobile: { width: 390, horizontalOverflow: true, scrollWidth: 960, screenshot: null } }) };
-    expect((await runCheck("no_horizontal_scroll", {}, wide)).evidence).toMatch(/is 960px wide, so content spills off the side/);
+    const spills = { ...base, rendered: rendered({ mobile: { width: 390, layoutWidth: 390, sidewaysScroll: 27, horizontalOverflow: true, offenders: [{ what: "img roaster.svg", right: 417 }], screenshot: null } }) };
+    expect((await runCheck("no_horizontal_scroll", {}, spills)).evidence).toBe("On a 390px phone the page scrolls 27px sideways, so content spills off the side. Sticking out: img roaster.svg (to 417px).");
+    const desktopLayout = { ...base, rendered: rendered({ mobile: { width: 390, layoutWidth: 980, sidewaysScroll: 0, horizontalOverflow: true, offenders: [], screenshot: null } }) };
+    expect((await runCheck("no_horizontal_scroll", {}, desktopLayout)).evidence).toMatch(/laid out 980px wide and shrunk to fit/);
     expect(await runCheck("no_js_errors", {}, { ...base, rendered: null, renderError: "no browser is available on this server" })).toMatchObject({ status: "error" });
+  });
+
+  it("finds forms the way sites actually build them", async () => {
+    const check = (html: string, fields: string[]) =>
+      runCheck("has_form", { fields }, { ...ctxFor("good"), page: parsePage({ url: ORIGIN, finalUrl: ORIGIN, status: 200, ms: 1, bytes: 1, truncated: false, html: `<body>${html}</body>` }) });
+    // A React-style form: no <form> tag, labels wrap the inputs, submitted from a button handler.
+    const app = `<div><label>Your name <input></label><label>Email address <input type="email"></label><label>Mobile <input type="tel"></label><textarea aria-label="How can we help?"></textarea><button>Send</button></div>`;
+    expect(await check(app, ["name", "email", "phone", "message"])).toMatchObject({ status: "pass" });
+    // Labels linked with aria-labelledby.
+    expect((await check(`<form><span id="l1">Comments</span><textarea aria-labelledby="l1"></textarea></form>`, ["message"])).status).toBe("pass");
+    // A honeypot or hidden field doesn't count as the visitor's email field.
+    expect(await check(`<form><input type="hidden" name="email"><input name="name"></form>`, ["name", "email"])).toMatchObject({ status: "fail", evidence: "The form is missing “email” (found “name”)." });
+    expect((await check(`<p>Call us</p>`, ["email"])).evidence).toBe("The page has no form fields.");
+  });
+
+  it("only calls a link broken when the server says the page isn't there", async () => {
+    const page = parsePage({ url: ORIGIN, finalUrl: `${ORIGIN}/`, status: 200, ms: 1, bytes: 1, truncated: false, html: `<body><a href="/a">a</a><a href="/b">b</a><a href="/c">c</a></body>` });
+    const statuses: Record<string, number> = { "/a": 200, "/b": 403, "/c": 429 };
+    const fetchUrl = async (u: string) => ({ status: statuses[new URL(u).pathname] ?? 404, body: "" });
+    const r = await runCheck("links_ok", {}, { ...ctxFor("good"), page, fetchUrl });
+    expect(r.status).toBe("pass");
+    expect(r.evidence).toMatch(/^The internal link works\. 2 links couldn't be verified/);
+    const allRefused = await runCheck("links_ok", {}, { ...ctxFor("good"), page, fetchUrl: async () => ({ status: 403, body: "" }) });
+    expect(allRefused.status).toBe("error");
+    const gone = await runCheck("links_ok", {}, { ...ctxFor("good"), page, fetchUrl: async (u: string) => ({ status: new URL(u).pathname === "/c" ? 404 : 200, body: "" }) });
+    expect(gone).toMatchObject({ status: "fail" });
+  });
+
+  it("counts sections whether they're marked with <section>, h2 or h3", async () => {
+    const check = (html: string) => runCheck("min_sections", { min: 3 }, { ...ctxFor("good"), page: parsePage({ url: ORIGIN, finalUrl: ORIGIN, status: 200, ms: 1, bytes: 1, truncated: false, html: `<body><h1>Site</h1>${html}</body>` }) });
+    expect((await check("<div><h3>A</h3></div><div><h3>B</h3></div><div><h3>C</h3></div>")).status).toBe("pass");
+    expect((await check("<section>A</section><section>B</section><section></section>")).status).toBe("fail");
   });
 
   it("requires HTTPS", async () => {

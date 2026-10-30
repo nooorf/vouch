@@ -39,10 +39,15 @@ export interface RefereeReport {
   renderError: string | null;
   /** Screenshot of the page on a phone (real browser, else Lighthouse), for the AI judge. */
   screenshot: { mimeType: string; data: string } | null;
-  /** The visible text the AI judge reads, clipped. */
+  /** The visible text the AI judge reads, clipped to PAGE_TEXT_LIMIT characters. */
   pageText: string;
+  /** The page had more text than the judge reads. */
+  pageTextClipped: boolean;
   ms: number;
 }
+
+/** About 10k tokens: whole pages for nearly every site, while staying on the free tier. */
+export const PAGE_TEXT_LIMIT = 40_000;
 
 export interface RunInput {
   url: string;
@@ -112,6 +117,9 @@ export async function runReferee(input: RunInput): Promise<RefereeReport> {
   const staticPage = page;
   if (page && rendered) {
     page = parsePage({ url: input.url, finalUrl: page.finalUrl, status: page.status, ms: page.ms, bytes: page.bytes, truncated: page.truncated, html: rendered.html });
+    // The browser knows what's actually visible (stylesheets and classes applied); our HTML parser
+    // only sees inline styles. Use its text whenever we have it.
+    page = { ...page, visibleText: rendered.visibleText };
   }
 
   const checks = input.criteria.filter((c) => c.kind === "check");
@@ -152,7 +160,7 @@ export async function runReferee(input: RunInput): Promise<RefereeReport> {
 
   const psResult = ps ? await ps : null;
   // Scan both the HTML as sent and the page after JavaScript ran: instructions can be injected either way.
-  const scans = [staticPage, rendered ? page : null].filter((p): p is Page => Boolean(p)).map(findSuspicious);
+  const scans = [staticPage ? findSuspicious(staticPage) : null, rendered && page ? findSuspicious(page, rendered.hiddenText) : null].filter((s) => s !== null);
   const findings = scans.flatMap((s) => s.findings).filter((f, i, all) => all.findIndex((g) => g.excerpt.slice(0, 80) === f.excerpt.slice(0, 80)) === i);
   return {
     url: input.url,
@@ -177,7 +185,8 @@ export async function runReferee(input: RunInput): Promise<RefereeReport> {
     renderError,
     // Our own phone screenshot when we rendered the page, otherwise Lighthouse's.
     screenshot: rendered?.mobile.screenshot ?? (psResult?.ok ? psResult.screenshot : null),
-    pageText: page ? page.visibleText.slice(0, 8000) : "",
+    pageText: page ? page.visibleText.slice(0, PAGE_TEXT_LIMIT) : "",
+    pageTextClipped: (page?.visibleText.length ?? 0) > PAGE_TEXT_LIMIT,
     ms: Date.now() - started,
   };
 }

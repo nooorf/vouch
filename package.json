@@ -20,7 +20,8 @@
     "env:check": "node --env-file-if-exists=.env.local --import tsx scripts/env-check.ts",
     "eval": "node --env-file-if-exists=.env.local --import tsx evals/run.ts",
     "demo:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-demo.ts",
-    "referee": "node --env-file-if-exists=.env.local --import tsx scripts/referee.ts"
+    "referee": "node --env-file-if-exists=.env.local --import tsx scripts/referee.ts",
+    "test:browser": "vitest run --config vitest.browser.config.mts"
   },
   "dependencies": {
     "@google/genai": "2.32.0",
@@ -34,6 +35,7 @@
     "puppeteer-core": "25.16.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "tldts": "^7.4.19",
     "zod": "4.6.7"
   },
   "devDependencies": {

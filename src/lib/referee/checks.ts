@@ -66,11 +66,16 @@ function hasH1(page: Page): CheckOutcome {
   return pass(`Main heading: ${quote(h1s[0])} (${h1s.length} headings are marked as h1; one is best practice).`, { count: h1s.length });
 }
 
+/**
+ * Content sections: <section> elements, or the headings one level under the main heading (h2; h3
+ * on pages that skip h2). Whichever shows more, since sites mark sections up either way.
+ */
 function minSections(page: Page, min: number): CheckOutcome {
-  const sections = page.$("section").length;
+  const sections = page.$("section").filter((_, el) => page.$(el).text().trim().length > 0).length;
   const h2 = page.$("h2").length;
-  const count = Math.max(sections, h2);
-  const measured = { sections, h2, count, min };
+  const h3 = h2 === 0 ? page.$("h3").length : 0;
+  const count = Math.max(sections, h2, h3);
+  const measured = { sections, h2, h3, count, min };
   return count >= min ? pass(`${plural(count, "content section")} found (needs ${min}).`, measured) : fail(`Only ${plural(count, "content section")} found (needs ${min}).`, measured);
 }
 
@@ -132,25 +137,55 @@ function imgAltRatio(page: Page, minRatio: number): CheckOutcome {
   return ratio >= minRatio ? pass(`${line}.`, measured) : fail(`${line}. Missing on ${missing.map((m) => quote(m.split("/").pop()!)).join(", ")}.`, measured);
 }
 
+/** Words people use for the same field: a brief's "phone" is a form's "tel" or "mobile". */
+const FIELD_SYNONYMS: Record<string, string[]> = {
+  name: ["name"],
+  email: ["email", "e-mail", "e mail"],
+  phone: ["phone", "tel", "mobile", "cell"],
+  message: ["message", "comment", "enquiry", "inquiry", "question", "details", "textarea"],
+  company: ["company", "organization", "organisation", "business"],
+  subject: ["subject", "topic"],
+};
+const synonyms = (field: string) => FIELD_SYNONYMS[fold(field)] ?? [fold(field)];
+
+/**
+ * A form with the brief's fields. Apps often skip the <form> tag and submit from a button, so
+ * fields outside any form count as one more group. A field matches by its name, id, type,
+ * placeholder, label (for=, wrapping or aria-labelledby) or autocomplete hint.
+ */
 function hasForm(page: Page, fields: string[]): CheckOutcome {
-  const forms = page.$("form");
-  if (forms.length === 0) return fail("The page has no form.");
+  const { $ } = page;
+  const usable = "input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]):not([type=image]), textarea, select";
+  const groups = $("form")
+    .map((_, form) => [$(form).find(usable).toArray()])
+    .get() as unknown as Parameters<typeof $>[0][][];
+  const loose = $(usable)
+    .filter((_, el) => $(el).closest("form").length === 0)
+    .toArray();
+  if (loose.length) groups.push(loose);
+  const nonEmpty = groups.filter((g) => g.length > 0);
+  if (nonEmpty.length === 0) return fail("The page has no form fields.");
+
+  const describe = (c: Parameters<typeof $>[0]) => {
+    const el = $(c);
+    const id = el.attr("id");
+    const labelledBy = (el.attr("aria-labelledby") ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((ref) => $(`[id="${ref}"]`).text())
+      .join(" ");
+    const forLabel = id ? $(`label[for="${id}"]`).text() : "";
+    const tag = (c as { tagName?: string }).tagName ?? "";
+    return fold([tag, el.attr("name"), id, el.attr("type"), el.attr("placeholder"), el.attr("aria-label"), el.attr("autocomplete"), forLabel, el.closest("label").text(), labelledBy].filter(Boolean).join(" "));
+  };
+
   let best: { found: string[]; missing: string[] } | null = null;
-  forms.each((_, form) => {
-    const controls = page.$(form).find("input, textarea, select");
-    const haystack = controls
-      .map((_, c) => {
-        const el = page.$(c);
-        const id = el.attr("id");
-        const label = id ? page.$(`label[for="${id}"]`).text() : "";
-        return fold([el.attr("name"), id, el.attr("type"), el.attr("placeholder"), el.attr("aria-label"), el.attr("autocomplete"), label].filter(Boolean).join(" "));
-      })
-      .get()
-      .join(" | ");
-    const found = fields.filter((f) => haystack.includes(fold(f)));
+  for (const group of nonEmpty) {
+    const haystack = group.map(describe).join(" | ");
+    const found = fields.filter((f) => synonyms(f).some((w) => haystack.includes(w)));
     const missing = fields.filter((f) => !found.includes(f));
     if (!best || found.length > best.found.length) best = { found, missing };
-  });
+  }
   const b = best!;
   if (b.missing.length === 0) return pass(`A form with ${b.found.map(quote).join(", ")}.`, b);
   return fail(`The form is missing ${b.missing.map(quote).join(", ")}${b.found.length ? ` (found ${b.found.map(quote).join(", ")})` : ""}.`, b);
@@ -181,23 +216,32 @@ async function linksOk(page: Page, ctx: CheckContext): Promise<CheckOutcome> {
   });
   const list = [...urls].slice(0, 10);
   if (list.length === 0) return pass("No other internal pages are linked.", { checked: 0 });
+  // Broken: the page isn't there (404, 410) or the server fails (5xx). Sites that refuse automated
+  // requests (401, 403, 429) or time out tell us nothing either way: "couldn't verify", not broken.
   const broken: string[] = [];
+  const unverified: string[] = [];
   for (const u of list) {
+    const path = new URL(u).pathname;
     try {
       let res = await ctx.fetchUrl(u, "HEAD");
-      if (res.status === 405 || res.status === 501) res = await ctx.fetchUrl(u, "GET");
-      if (res.status >= 400) broken.push(`${new URL(u).pathname} (${res.status})`);
+      if (res.status === 405 || res.status === 501 || res.status === 403) res = await ctx.fetchUrl(u, "GET");
+      if (res.status === 404 || res.status === 410 || res.status >= 500) broken.push(`${path} (${res.status})`);
+      else if (res.status >= 400) unverified.push(`${path} (${res.status})`);
     } catch {
-      broken.push(`${new URL(u).pathname} (unreachable)`);
+      unverified.push(`${path} (no answer)`);
     }
   }
-  const measured = { checked: list.length, broken };
-  const ok = list.length - broken.length;
-  return broken.length === 0 ? pass(list.length === 1 ? "The internal link works." : `All ${list.length} internal links work.`, measured) : fail(`${ok} of ${plural(list.length, "internal link")} work. Broken: ${broken.slice(0, 3).join(", ")}.`, measured);
+  const measured = { checked: list.length, broken, unverified };
+  const verified = list.length - unverified.length;
+  const note = unverified.length ? ` ${plural(unverified.length, "link")} couldn't be verified (the server refused or didn't answer an automated request): ${unverified.slice(0, 3).join(", ")}.` : "";
+  if (broken.length) return fail(`${verified - broken.length} of ${plural(list.length, "internal link")} work. Broken: ${broken.slice(0, 3).join(", ")}.${note}`, measured);
+  if (verified === 0) return error(`None of the ${plural(list.length, "internal link")} could be verified.${note}`);
+  return pass(`${verified === 1 ? "The internal link works" : `All ${verified} checked internal links work`}.${note}`, measured);
 }
 
 function noPlaceholderText(page: Page): CheckOutcome {
-  const found = findPlaceholders(page.visibleText);
+  const headings = page.$("h1, h2, h3, h4, h5, h6, title").map((_, el) => page.$(el).text()).get();
+  const found = findPlaceholders(page.visibleText, headings);
   if (!found.length) return pass("No placeholder text found.");
   return fail(`Placeholder text left in: ${found.slice(0, 3).map((f) => `${f.label} (“…${f.excerpt.slice(0, 60)}…”)`).join("; ")}.`, { found: found.map((f) => f.label) });
 }
@@ -233,9 +277,15 @@ function noFailedRequests(ctx: CheckContext): CheckOutcome {
 
 function noHorizontalScroll(ctx: CheckContext): CheckOutcome {
   const m = ctx.rendered!.mobile;
-  return m.horizontalOverflow
-    ? fail(`On a ${m.width}px phone the page is ${m.scrollWidth}px wide, so content spills off the side.`, { scrollWidth: m.scrollWidth })
-    : pass(`Fits a ${m.width}px phone screen.`, { scrollWidth: m.scrollWidth });
+  const measured = { layoutWidth: m.layoutWidth, sidewaysScroll: m.sidewaysScroll, offenders: m.offenders };
+  if (m.layoutWidth > m.width + 2) {
+    return fail(`On a ${m.width}px phone the page is laid out ${m.layoutWidth}px wide and shrunk to fit, so text is tiny (a desktop layout).`, measured);
+  }
+  if (m.horizontalOverflow) {
+    const cause = m.offenders.length ? ` Sticking out: ${m.offenders.map((o) => `${o.what} (to ${o.right}px)`).join(", ")}.` : "";
+    return fail(`On a ${m.width}px phone the page scrolls ${m.sidewaysScroll}px sideways, so content spills off the side.${cause}`, measured);
+  }
+  return pass(`Fits a ${m.width}px phone screen: no sideways scrolling.`, measured);
 }
 
 /* ---------------- Lighthouse ---------------- */
