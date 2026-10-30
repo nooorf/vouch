@@ -2,7 +2,6 @@ import {
   ApiError,
   Client,
   Environment,
-  LogLevel,
   OrdersController,
   PaymentsController,
 } from "@paypal/paypal-server-sdk";
@@ -41,7 +40,8 @@ export function paypal() {
         httpMethodsToRetry: ["GET", "POST"],
       },
     },
-    logging: { logLevel: LogLevel.Warn, maskSensitiveHeaders: true },
+    // No `logging` on purpose: any logging config makes the SDK print every request and response.
+    // Failures surface through paypalErrorInfo() and our own logs instead.
   });
   cached = { orders: new OrdersController(client), payments: new PaymentsController(client) };
   return cached;

@@ -4,11 +4,12 @@
  *   npm run smoke              # funds go to your sandbox Business (platform) account
  *   npm run smoke -- --payee   # funds go straight to PAYPAL_FREELANCER_EMAIL instead
  *
+ * No terminal input needed: the script waits until the order is approved in the browser.
+ *
  * Steps: authorize $10 -> capture $6 (not final) -> retry that capture with the same
  * request id (must return the same capture) -> try a reauthorize (information only)
  * -> capture $3 (not final) -> void the remaining $1 -> refund $1 of the first capture.
  */
-import { createInterface } from "node:readline/promises";
 import { CheckoutPaymentIntent } from "@paypal/paypal-server-sdk";
 import { paypal, paypalErrorInfo, usd } from "../src/lib/paypal/client";
 
@@ -81,10 +82,18 @@ async function main() {
   });
 
   const approveUrl = order?.links?.find((l) => l.rel === "payer-action" || l.rel === "approve")?.href;
-  console.log(`\n  Open this link, log in as a sandbox Personal buyer and approve:\n  ${approveUrl}\n`);
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  await rl.question("  Press Enter after approving (the redirect page will not load; that is fine)... ");
-  rl.close();
+  console.log(`\n  APPROVE: open this link, log in as a sandbox Personal buyer and approve:\n  ${approveUrl}\n`);
+  console.log("  Waiting for approval (the page you land on afterwards won't load; that's fine)...");
+
+  await step("Buyer approves in the browser", async () => {
+    const deadline = Date.now() + 15 * 60_000;
+    for (;;) {
+      const { result } = await orders.getOrder({ id: order!.id! });
+      if (result.status === "APPROVED") return;
+      if (Date.now() > deadline) throw new Error(`Not approved within 15 minutes (status ${result.status})`);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  });
 
   const authorized = await step("Authorize order", async () => {
     const res = await orders.authorizeOrder({
