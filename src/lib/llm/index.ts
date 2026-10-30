@@ -2,8 +2,9 @@ import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import { db, schema } from "@/db";
 import { canonicalJson, sha256 } from "@/lib/brief/hash";
-import { env } from "@/lib/env";
+import { env, type Env } from "@/lib/env";
 import { GeminiProvider } from "./gemini";
+import { GroqProvider } from "./groq";
 import {
   LlmUnavailableError,
   ProviderUnavailableError,
@@ -52,16 +53,19 @@ const dbCache: LlmCache = {
   },
 };
 
+/** Every configured provider, LLM_PROVIDER first; later ones are fallbacks. */
+export function providersFor(e: Pick<Env, "LLM_PROVIDER" | "GEMINI_API_KEY" | "GROQ_API_KEY">): LlmProvider[] {
+  const make = { gemini: () => new GeminiProvider(), groq: () => new GroqProvider() };
+  const configured = { gemini: Boolean(e.GEMINI_API_KEY), groq: Boolean(e.GROQ_API_KEY) };
+  const order = e.LLM_PROVIDER === "groq" ? (["groq", "gemini"] as const) : (["gemini", "groq"] as const);
+  const list = order.filter((n) => configured[n]).map((n) => make[n]());
+  // None configured: Gemini, which fails with a clear "set GEMINI_API_KEY" message.
+  return list.length ? list : [new GeminiProvider()];
+}
+
 let providers: LlmProvider[] | null = null;
 function defaultProviders(): LlmProvider[] {
-  // Order matters: later providers are fallbacks. Groq will be added here.
-  providers ??= [env().LLM_PROVIDER].map((name) => {
-    switch (name) {
-      case "gemini":
-        return new GeminiProvider();
-    }
-  });
-  return providers;
+  return (providers ??= providersFor(env()));
 }
 
 /* ------------------------------------------------------------------ */

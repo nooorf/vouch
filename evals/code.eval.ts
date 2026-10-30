@@ -90,9 +90,9 @@ const bigRepo: RepoFile[] = [
 
 export const codeSuite: Suite<Input, CodeJudgeOutput> = {
   name: "code",
-  async run(input) {
+  async run(input, opts) {
     const criteria: JudgedCriterion[] = input.questions.map((x) => ({ kind: "judged", id: x.id, rubric: x.rubric, weight: 2, required: false, visual: false, source: "code" }));
-    const out = await judgeCode({ criteria, snapshot: snapshot(input.files) });
+    const out = await judgeCode({ criteria, snapshot: snapshot(input.files), cache: opts.fresh ? "refresh" : true });
     if (!out) throw new Error("code judge returned nothing");
     return { output: out, meta: { model: out.model, shown: out.filesShown.length, clipped: out.clipped } };
   },

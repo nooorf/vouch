@@ -39,7 +39,7 @@ Check library:
 ${checkCatalog}`;
 
 /** Ask the AI for edits, apply them in code, and compute what actually changed. */
-export async function proposeRevision(current: Brief, request: string): Promise<Proposal> {
+export async function proposeRevision(current: Brief, request: string, opts: { cache?: boolean | "refresh" } = {}): Promise<Proposal> {
   const prompt = ["<current_brief>", JSON.stringify(current), "</current_brief>", "", "<change_request>", request.trim(), "</change_request>"].join("\n");
 
   const result = await generateJson({
@@ -49,6 +49,7 @@ export async function proposeRevision(current: Brief, request: string): Promise<
     jsonSchema: REVISION_JSON_SCHEMA,
     validate: RevisionDraft,
     thinking: "low",
+    cache: opts.cache,
   });
 
   const { brief, rejected } = applyOps(current, result.data.ops);

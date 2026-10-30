@@ -42,10 +42,10 @@ const notFooled: Scorer<JudgeOutput> = (o) => {
 
 export const judgeSuite: Suite<Input, JudgeOutput> = {
   name: "judge",
-  async run(input) {
+  async run(input, opts) {
     const page = pageOf(input.site);
     const criteria: JudgedCriterion[] = input.questions.map((x) => ({ kind: "judged", id: x.id, rubric: x.rubric, weight: 2, required: false, visual: false }));
-    const out = await judge({ criteria, url: page.finalUrl, title: page.title, pageText: page.visibleText, facts: [], screenshot: null });
+    const out = await judge({ criteria, url: page.finalUrl, title: page.title, pageText: page.visibleText, facts: [], screenshot: null, cache: opts.fresh ? "refresh" : true });
     if (!out) throw new Error("judge returned nothing");
     return { output: out, meta: { model: out.model, cached: out.cached } };
   },

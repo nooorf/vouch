@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { generateJson } from "./index";
+import { generateJson, providersFor } from "./index";
 import { LlmUnavailableError, ProviderUnavailableError, type LlmCache, type LlmProvider } from "./types";
 
 const Answer = z.object({ ok: z.boolean() });
@@ -87,5 +87,15 @@ describe("generateJson", () => {
     const res = await generateJson(req, { providers: [fakeProvider("b", ['{"ok":false}'])], cache });
     expect(res).toMatchObject({ provider: "b", data: { ok: false } });
     expect(spy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("providersFor", () => {
+  const names = (e: Parameters<typeof providersFor>[0]) => providersFor(e).map((p) => p.name);
+  it("uses every configured provider, the chosen one first", () => {
+    expect(names({ LLM_PROVIDER: "gemini", GEMINI_API_KEY: "g".repeat(30), GROQ_API_KEY: "q".repeat(30) })).toEqual(["gemini", "groq"]);
+    expect(names({ LLM_PROVIDER: "groq", GEMINI_API_KEY: "g".repeat(30), GROQ_API_KEY: "q".repeat(30) })).toEqual(["groq", "gemini"]);
+    expect(names({ LLM_PROVIDER: "gemini", GEMINI_API_KEY: undefined, GROQ_API_KEY: "q".repeat(30) })).toEqual(["groq"]);
+    expect(names({ LLM_PROVIDER: "gemini", GEMINI_API_KEY: "g".repeat(30), GROQ_API_KEY: undefined })).toEqual(["gemini"]);
   });
 });

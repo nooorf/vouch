@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { JudgedCriterion } from "@/lib/brief/schema";
-import { generateJson } from "@/lib/llm";
+import { generateJson, LlmUnavailableError } from "@/lib/llm";
 import { blobUrl, type RepoFile, type RepoSnapshot } from "./repo-snapshot";
 
 /**
@@ -49,6 +49,8 @@ export interface CodeJudgeOutput {
 
 /** About 30k tokens of code: whole repositories for most freelance jobs, within the free tier. */
 export const CODE_BUDGET_CHARS = 120_000;
+/** When every available model refuses that size (free-tier per-minute limits): about 5k tokens of code. */
+export const SMALL_CODE_BUDGET_CHARS = 12_000;
 const PER_FILE_CHARS = 25_000;
 
 const MANIFEST = /^(readme(\.[a-z]+)?|package\.json|pyproject\.toml|requirements\.txt|cargo\.toml|go\.mod|composer\.json|gemfile|pom\.xml|build\.gradle)$/i;
@@ -347,40 +349,59 @@ export async function judgeCode(input: {
   criteria: JudgedCriterion[];
   snapshot: RepoSnapshot;
   objection?: { criterionIds: string[]; note: string } | null;
+  /** Reuse a cached identical answer (default), or "refresh" to ask again (evals). */
+  cache?: boolean | "refresh";
 }): Promise<CodeJudgeOutput | null> {
   if (!input.criteria.length) return null;
   const { snapshot } = input;
-  const { files, clipped } = selectFiles(snapshot.files, input.criteria.map((c) => c.rubric));
-  const shown = new Map<string, { file: RepoFile; lastLine: number }>();
-  const blocks = files.map((f) => {
-    const n = numbered(f);
-    shown.set(f.path, { file: f, lastLine: n.lastLine });
-    return `<file path="${f.path}">\n${n.body}\n</file>`;
-  });
+  const rubrics = input.criteria.map((c) => c.rubric);
 
-  const prompt = [
-    `Repository: github.com/${snapshot.owner}/${snapshot.repo} at commit ${snapshot.sha.slice(0, 12)} (${snapshot.files.length} source files${clipped ? `; the ${files.length} most relevant to the questions are shown` : ", all shown"})`,
-    "",
-    "Questions:",
-    ...input.criteria.map((c) => `- criterionId "${c.id}": ${c.rubric}`),
-    "",
-    "<repository>",
-    ...blocks,
-    "</repository>",
-    ...(clipped
-      ? [
-          "",
-          `Other files in the repository, not shown (names only; you can't cite them): ${snapshot.files
-            .filter((f) => !shown.has(f.path))
-            .slice(0, 300)
-            .map((f) => f.path)
-            .join(", ")}`,
-        ]
-      : []),
-    ...(input.objection ? ["", "<client_objection>", `Disputed questions: ${input.objection.criterionIds.join(", ")}`, input.objection.note, "</client_objection>"] : []),
-  ].join("\n");
+  const build = (budget: number, maxNames: number) => {
+    const { files, clipped } = selectFiles(snapshot.files, rubrics, budget);
+    const shown = new Map<string, { file: RepoFile; lastLine: number }>();
+    const blocks = files.map((f) => {
+      const n = numbered(f);
+      shown.set(f.path, { file: f, lastLine: n.lastLine });
+      return `<file path="${f.path}">\n${n.body}\n</file>`;
+    });
+    const prompt = [
+      `Repository: github.com/${snapshot.owner}/${snapshot.repo} at commit ${snapshot.sha.slice(0, 12)} (${snapshot.files.length} source files${clipped ? `; the ${files.length} most relevant to the questions are shown` : ", all shown"})`,
+      "",
+      "Questions:",
+      ...input.criteria.map((c) => `- criterionId "${c.id}": ${c.rubric}`),
+      "",
+      "<repository>",
+      ...blocks,
+      "</repository>",
+      ...(clipped
+        ? [
+            "",
+            `Other files in the repository, not shown (names only; you can't cite them): ${snapshot.files
+              .filter((f) => !shown.has(f.path))
+              .slice(0, maxNames)
+              .map((f) => f.path)
+              .join(", ")}`,
+          ]
+        : []),
+      ...(input.objection ? ["", "<client_objection>", `Disputed questions: ${input.objection.criterionIds.join(", ")}`, input.objection.note, "</client_objection>"] : []),
+    ].join("\n");
+    return { files, clipped, shown, prompt };
+  };
+  const ask = (prompt: string) => generateJson({ task: "referee.code-judge", system: SYSTEM, prompt, jsonSchema: JSON_SCHEMA, validate: Answer, thinking: "low", cache: input.cache });
 
-  const res = await generateJson({ task: "referee.code-judge", system: SYSTEM, prompt, jsonSchema: JSON_SCHEMA, validate: Answer, thinking: "low" });
+  let built = build(CODE_BUDGET_CHARS, 300);
+  let res: Awaited<ReturnType<typeof ask>>;
+  try {
+    res = await ask(built.prompt);
+  } catch (err) {
+    // Every available model refused the size (e.g. Gemini out of quota, and Groq's free tier allows
+    // 8k tokens a minute): try once more with fewer, more relevant files.
+    if (!(err instanceof LlmUnavailableError) || !/too large/i.test(err.detail ?? "")) throw err;
+    built = build(SMALL_CODE_BUDGET_CHARS, 80);
+    if (!built.clipped) throw err;
+    res = await ask(built.prompt);
+  }
+  const { files, clipped, shown } = built;
 
   const byId = new Map(res.data.results.map((r) => [r.criterionId, r]));
   const results = input.criteria.map((c): CodeJudgedResult => {

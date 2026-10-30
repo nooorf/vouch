@@ -38,8 +38,8 @@ const total = (cents: number): Scorer<Proposal> => (p) => ({ name: `total is ${c
 
 export const reviseSuite: Suite<string, Proposal> = {
   name: "revise",
-  async run(request) {
-    const p = await proposeRevision(demoBrief, request);
+  async run(request, { fresh }) {
+    const p = await proposeRevision(demoBrief, request, { cache: fresh ? "refresh" : true });
     return { output: p, meta: { model: p.model, changes: p.changes.length, rejected: p.rejected.length } };
   },
   cases: [

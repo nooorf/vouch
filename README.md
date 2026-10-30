@@ -57,7 +57,7 @@ Orders v2 (create with intent AUTHORIZE, authorize, get) and Payments v2 (partia
 
 ## AI
 
-Google Gemini (`gemini-3.8-flash`, free tier) through `@google/genai` drafts briefs and judges subjective criteria. It never moves money: `src/lib/policy` decides every release.
+Google Gemini (`gemini-3.8-flash`, free tier) through `@google/genai` drafts briefs and judges subjective criteria, with Groq's free tier as the fallback when Gemini is out of quota or busy (`src/lib/llm/`: providers are tried in order, and every answer is validated against a schema). The AI never moves money: `src/lib/policy` decides every release.
 
 ## Built with APIMatic
 

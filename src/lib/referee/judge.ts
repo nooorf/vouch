@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { JudgedCriterion } from "@/lib/brief/schema";
-import { generateJson } from "@/lib/llm";
+import { generateJson, LlmUnavailableError } from "@/lib/llm";
 import { fold } from "./page";
 import { findPlaceholders, looksLikePlaceholder } from "./placeholder";
 
@@ -20,6 +20,8 @@ export interface JudgeInput {
   screenshot: { mimeType: string; data: string } | null;
   /** On a dispute's re-check: what the client disagrees with, in their words. */
   objection?: { criterionIds: string[]; note: string } | null;
+  /** Reuse a cached identical answer (default), or "refresh" to ask again (evals). */
+  cache?: boolean | "refresh";
 }
 
 export interface JudgedResult {
@@ -104,6 +106,9 @@ const plainTypography = (s: string) =>
     .replace(/[‐‑‒–—―]/g, "-")
     .replace(/[\u00a0\u2007\u202f]/g, " ");
 
+/** Page text sent when every available model refuses the full page (free-tier per-minute limits). */
+const SMALL_PAGE_TEXT = 16_000;
+
 /** Is the quote really on the page? Accent, case, whitespace and typography insensitive; "…" separates fragments. */
 export function quoteOnPage(quote: string, pageText: string): boolean {
   const text = fold(plainTypography(pageText));
@@ -124,34 +129,47 @@ export async function judge(input: JudgeInput): Promise<JudgeOutput | null> {
     .map((c) => `- criterionId "${c.id}": ${c.rubric}${c.visual ? (useScreenshot ? " (answer from the screenshot)" : " (no screenshot available: answer from the text if you can)") : ""}`)
     .join("\n");
   const placeholders = findPlaceholders(input.pageText);
-  const prompt = [
-    `URL: ${input.url}`,
-    `Page title: ${input.title}`,
-    "",
-    "Measured facts (already checked by code):",
-    ...input.facts.map((f) => `- ${f}`),
-    ...(placeholders.length ? [`- Placeholder text found on the page: ${placeholders.map((p) => p.label).join(", ")}`] : []),
-    "",
-    "Questions:",
-    questions,
-    "",
-    "<page_text>",
-    input.pageText,
-    "</page_text>",
-    ...(input.objection
-      ? ["", "<client_objection>", `Disputed questions: ${input.objection.criterionIds.join(", ")}`, input.objection.note, "</client_objection>"]
-      : []),
-  ].join("\n");
+  const build = (pageText: string, cut: boolean) =>
+    [
+      `URL: ${input.url}`,
+      `Page title: ${input.title}`,
+      "",
+      "Measured facts (already checked by code):",
+      ...input.facts.map((f) => `- ${f}`),
+      ...(placeholders.length ? [`- Placeholder text found on the page: ${placeholders.map((p) => p.label).join(", ")}`] : []),
+      ...(cut ? [`- page_text below is the first ${pageText.length.toLocaleString("en")} characters of the page; don't answer no only because something may be further down.`] : []),
+      "",
+      "Questions:",
+      questions,
+      "",
+      "<page_text>",
+      pageText,
+      "</page_text>",
+      ...(input.objection
+        ? ["", "<client_objection>", `Disputed questions: ${input.objection.criterionIds.join(", ")}`, input.objection.note, "</client_objection>"]
+        : []),
+    ].join("\n");
+  const ask = (prompt: string) =>
+    generateJson({
+      task: "referee.judge",
+      system: SYSTEM,
+      prompt,
+      images: useScreenshot ? [input.screenshot!] : undefined,
+      jsonSchema: JSON_SCHEMA,
+      validate: Answer,
+      thinking: "low",
+      cache: input.cache,
+    });
 
-  const res = await generateJson({
-    task: "referee.judge",
-    system: SYSTEM,
-    prompt,
-    images: useScreenshot ? [input.screenshot!] : undefined,
-    jsonSchema: JSON_SCHEMA,
-    validate: Answer,
-    thinking: "low",
-  });
+  let res: Awaited<ReturnType<typeof ask>>;
+  try {
+    res = await ask(build(input.pageText, false));
+  } catch (err) {
+    // Every available model refused the size (free-tier per-minute limits): once more with the
+    // start of the page. Quotes are still checked against the full page text.
+    if (!(err instanceof LlmUnavailableError) || !/too large/i.test(err.detail ?? "") || input.pageText.length <= SMALL_PAGE_TEXT) throw err;
+    res = await ask(build(input.pageText.slice(0, SMALL_PAGE_TEXT), true));
+  }
 
   const byId = new Map(res.data.results.map((r) => [r.criterionId, r]));
   const results: JudgedResult[] = input.criteria.map((c) => {

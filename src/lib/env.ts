@@ -31,10 +31,17 @@ const EnvSchema = z
     DEMO_BUYER_EMAIL: opt(z.email("DEMO_BUYER_EMAIL must be an email")),
     DEMO_BUYER_PASSWORD: opt(z.string().min(1)),
 
-    LLM_PROVIDER: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["gemini"]).default("gemini")),
+    /** Which AI provider to try first; the other (if configured) is the fallback. */
+    LLM_PROVIDER: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["gemini", "groq"]).default("gemini")),
     GEMINI_API_KEY: opt(z.string().min(20)),
     GEMINI_MODEL: z.preprocess((v) => (v === "" ? undefined : v), z.string().default("gemini-3.8-flash")),
     GEMINI_FALLBACK_MODEL: z.preprocess((v) => (v === "" ? undefined : v), z.string().default("gemini-flash-lite-latest")),
+    /** Groq (free tier): fallback AI when Gemini is out of quota or busy. */
+    GROQ_API_KEY: opt(z.string().min(20)),
+    /** Text models, tried in order (free-tier token limits differ by model). */
+    GROQ_MODELS: z.preprocess((v) => (v === "" ? undefined : v), z.string().default("openai/gpt-oss-120b,qwen/qwen3.8-27b")),
+    /** For requests with a screenshot. */
+    GROQ_VISION_MODEL: z.preprocess((v) => (v === "" ? undefined : v), z.string().default("qwen/qwen3.8-27b")),
 
     GITHUB_TOKEN: opt(z.string().min(10)),
     PAGESPEED_API_KEY: opt(z.string().min(10)),
@@ -105,6 +112,7 @@ export const FEATURES = {
   paypal: { label: "PayPal payments", needs: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET", "NEXT_PUBLIC_PAYPAL_CLIENT_ID"] },
   paypalWebhooks: { label: "PayPal webhooks", needs: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET", "PAYPAL_WEBHOOK_ID"] },
   ai: { label: "AI (Gemini)", needs: ["GEMINI_API_KEY"] },
+  groq: { label: "AI fallback (Groq)", needs: ["GROQ_API_KEY"] },
   githubChecks: { label: "GitHub repo checks", needs: ["GITHUB_TOKEN"] },
   kernel: { label: "Web app rendering in Kernel cloud browsers", needs: ["KERNEL_API_KEY"] },
   pagespeed: { label: "Lighthouse via PageSpeed (the keyless quota is shared and often used up)", needs: ["PAGESPEED_API_KEY"] },
