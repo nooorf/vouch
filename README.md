@@ -28,9 +28,19 @@ npm run demo:warm            # pre-compute the AI draft for the demo example (in
 npm test                     # unit tests (policy, brief, money, session)
 npm run smoke                # PayPal sandbox smoke test (opens an approval link)
 npm run smoke -- --payee     # same, paying a second sandbox account as the freelancer
+npm run env:check            # validate config and list which features are on
 npm run dev
 npm run e2e                  # browser walk-through of the demo against localhost:3000
+npm run eval                 # AI evals: drafted briefs scored against fixed expectations (add --fresh to skip cache)
 ```
+
+## Quality checks
+
+- **Schemas at every boundary**: Zod validates AI output, form input, briefs and environment variables; Drizzle types the database.
+- **Unit tests** (`npm test`) for the policy engine, money math, brief repair and lint, sessions, config and the AI layer (with a fake provider).
+- **AI evals** (`npm run eval`) run the real model on fixed cases, including a prompt-injection attempt.
+- **Browser walk-through** (`npm run e2e`) of the demo flow.
+- **CI** on every push: typecheck, lint, unit tests, build.
 
 ## PayPal APIs used
 

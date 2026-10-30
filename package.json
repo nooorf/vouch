@@ -9,14 +9,16 @@
     "lint": "eslint",
     "test": "vitest run",
     "smoke": "node --env-file-if-exists=.env.local --import tsx scripts/smoke.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:check": "node --env-file-if-exists=.env.local --import tsx scripts/db-check.ts",
     "brief:try": "node --env-file-if-exists=.env.local --import tsx scripts/draft-brief.ts",
     "demo:warm": "node --env-file-if-exists=.env.local --import tsx scripts/warm-ai-cache.ts",
-    "e2e": "node --import tsx scripts/e2e.ts"
+    "e2e": "node --import tsx scripts/e2e.ts",
+    "env:check": "node --env-file-if-exists=.env.local --import tsx scripts/env-check.ts",
+    "eval": "node --env-file-if-exists=.env.local --import tsx evals/run.ts"
   },
   "dependencies": {
     "@google/genai": "2.32.0",

@@ -49,3 +49,6 @@ next-env.d.ts
 /Vouch AI Escrow for Freelance Work - Setup, Plan and Demo.md
 /.claude/
 /AGENTS.md
+
+# Eval run outputs
+/evals/results/

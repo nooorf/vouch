@@ -8,7 +8,7 @@ import { db, schema } from "@/db";
 import { draftBrief } from "@/lib/brief/generate";
 import { briefHash, sha256 } from "@/lib/brief/hash";
 import { Brief, MAX_JOB_DAYS } from "@/lib/brief/schema";
-import { LlmUnavailableError } from "@/lib/llm/gemini";
+import { LlmUnavailableError } from "@/lib/llm";
 import { requireUser } from "@/lib/session";
 
 const NewJobInput = z.object({

@@ -6,12 +6,7 @@ import {
   OrdersController,
   PaymentsController,
 } from "@paypal/paypal-server-sdk";
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing env var ${name}`);
-  return value;
-}
+import { requireFeature } from "@/lib/env";
 
 let cached: { orders: OrdersController; payments: PaymentsController } | null = null;
 
@@ -23,13 +18,14 @@ let cached: { orders: OrdersController; payments: PaymentsController } | null = 
  */
 export function paypal() {
   if (cached) return cached;
+  const e = requireFeature("paypal");
   const client = new Client({
     clientCredentialsAuthCredentials: {
-      oAuthClientId: requireEnv("PAYPAL_CLIENT_ID"),
-      oAuthClientSecret: requireEnv("PAYPAL_CLIENT_SECRET"),
+      oAuthClientId: e.PAYPAL_CLIENT_ID!,
+      oAuthClientSecret: e.PAYPAL_CLIENT_SECRET!,
     },
-    environment:
-      process.env.PAYPAL_ENV === "live" ? Environment.Production : Environment.Sandbox,
+    // env() refuses PAYPAL_ENV=live: Vouch only runs against the sandbox.
+    environment: Environment.Sandbox,
     // The SDK default is 0, which axios treats as "wait forever".
     timeout: 15_000,
     httpClientOptions: {

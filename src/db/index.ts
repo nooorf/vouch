@@ -1,12 +1,12 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { env } from "@/lib/env";
 import * as schema from "./schema";
 
 function connectionString() {
   // The app uses Neon's pooled endpoint; migrations use the direct one (drizzle.config.ts).
-  const url = process.env.DATABASE_URL_POOLED ?? process.env.DATABASE_URL;
-  if (!url) throw new Error("Missing DATABASE_URL_POOLED (or DATABASE_URL)");
-  return url;
+  const e = env();
+  return (e.DATABASE_URL_POOLED ?? e.DATABASE_URL)!;
 }
 
 function create() {
