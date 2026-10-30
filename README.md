@@ -10,6 +10,7 @@ Pay-on-proof for freelance work. The client's payment is held by PayPal (authori
 
 Day 1. Done so far:
 
+- App shell: landing page, "Try the demo" (a private demo workspace per visitor, signed session cookie) and the freelancer dashboard with the money bar.
 - `src/lib/policy/`: the policy engine (verdicts, partial releases, review window, capture guards), with tests.
 - `src/lib/brief/`: the brief schema, check library, agreement hash and demo brief, with tests.
 - `src/db/`: Postgres schema (Drizzle) for jobs, brief versions, milestones, evaluations, payments, the event ledger and a task queue; migrations in `drizzle/`.

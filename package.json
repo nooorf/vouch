@@ -19,6 +19,7 @@
     "@google/genai": "2.32.0",
     "@paypal/paypal-server-sdk": "2.5.0",
     "drizzle-orm": "0.45.4",
+    "geist": "1.8.2",
     "next": "16.4.3",
     "postgres": "4.0.0",
     "react": "19.3.0",

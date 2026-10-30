@@ -1,26 +1,113 @@
 @import "tailwindcss";
 
+/* Design tokens. Components use these names, never raw colors. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --bg: #f6f6f3;
+  --surface: #ffffff;
+  --surface-2: #f0f0ec;
+  --ink: #15171b;
+  --muted: #5d6370;
+  --line: #e3e3de;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --brand: #0d7a64;
+  --brand-hover: #0a6553;
+  --brand-ink: #ffffff;
+  --brand-soft: #e2f1ec;
+
+  /* Money states */
+  --released: #0d7a64;
+  --held: #c27c14;
+  --held-soft: #fbf0dc;
+  --unfunded: #cfd3da;
+
+  --danger: #b42318;
+  --danger-soft: #fdeceb;
+  --info: #2457c5;
+  --info-soft: #e8eefb;
+
+  --ring: #0d7a6455;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0d0f12;
+    --surface: #15181d;
+    --surface-2: #1b1f25;
+    --ink: #eceef1;
+    --muted: #9aa1ad;
+    --line: #272b32;
+
+    --brand: #35c29f;
+    --brand-hover: #4fd2b0;
+    --brand-ink: #062a22;
+    --brand-soft: #123129;
+
+    --released: #35c29f;
+    --held: #e6a640;
+    --held-soft: #33270f;
+    --unfunded: #3a3f48;
+
+    --danger: #f2766b;
+    --danger-soft: #3a1714;
+    --info: #7da2f5;
+    --info-soft: #172240;
+
+    --ring: #35c29f66;
+    color-scheme: dark;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-released: var(--released);
+  --color-held: var(--held);
+  --color-held-soft: var(--held-soft);
+  --color-unfunded: var(--unfunded);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  background: var(--bg);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* Amounts line up in tables and bars. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Diagonal stripes mark money that is held, not yet released. */
+.held-stripes {
+  background-color: var(--held);
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    rgb(255 255 255 / 0.22) 6px 12px
+  );
 }
