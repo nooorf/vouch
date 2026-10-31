@@ -32,7 +32,7 @@ export function splitMoney(p: { totalCents: number; authorizedCents: number; rel
   };
 }
 
-/** What went back to the client: on a completed job, everything authorized but not captured was voided. */
+/** What went back to the client: on a completed or cancelled job, everything authorized but not captured is voided. */
 export function returnedCents(job: { status: string; authorizedCents: number; capturedCents: number }): number {
-  return job.status === "COMPLETED" ? Math.max(0, job.authorizedCents - job.capturedCents) : 0;
+  return job.status === "COMPLETED" || job.status === "CANCELLED" ? Math.max(0, job.authorizedCents - job.capturedCents) : 0;
 }

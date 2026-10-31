@@ -13,6 +13,7 @@ import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
 import { env, hasFeature } from "@/lib/env";
 import { findJobByClientToken } from "@/lib/jobs/agreement";
+import { cancelView } from "@/lib/jobs/cancel";
 import { drainTasks } from "@/lib/jobs/runner";
 import { choiceViews } from "@/lib/jobs/choice-views";
 import { choicesFor } from "@/lib/jobs/settle";
@@ -21,6 +22,7 @@ import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { stepIndex } from "@/lib/jobs/status";
 import { formatCents, returnedCents } from "@/lib/money";
 import { getCurrentUser } from "@/lib/session";
+import { ClientCancelPanel } from "./cancel-panel";
 import { ClientActions } from "./client-actions";
 import { FundCard } from "./fund-card";
 import { ReviewPanel } from "./review-panel";
@@ -64,6 +66,7 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
   const pendingRequest = job.status === "DRAFT" ? versions[0]?.changeRequest : null;
 
   const isDemoOwner = viewer?.demo && viewer.id === job.ownerId;
+  const cancel = cancelView(job, milestones);
 
   return (
     <Container className="max-w-5xl py-10">
@@ -166,6 +169,24 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
                 {job.status === "COMPLETED"
                   ? `Done. ${formatCents(job.capturedCents)} was paid for the delivered work${job.authorizedCents > job.capturedCents ? ` and ${formatCents(job.authorizedCents - job.capturedCents)} was released back to you` : ""}.`
                   : `${formatCents(job.authorizedCents)} is held by PayPal. Each milestone is paid only when its delivery passes the agreed checks or you approve it.`}
+              </p>
+              <div className="mt-4">
+                <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} returnedCents={returnedCents(job)} />
+              </div>
+            </Card>
+          )}
+          {cancel.live && (
+            <div className="mt-4">
+              <ClientCancelPanel token={token} freelancer={owner?.name ?? "the freelancer"} view={cancel} />
+            </div>
+          )}
+          {job.status === "CANCELLED" && (
+            <Card className="p-5">
+              <Badge tone="neutral">Cancelled</Badge>
+              <p className="mt-3 text-sm">
+                {job.authorizedCents > 0
+                  ? `This job was cancelled. ${formatCents(job.capturedCents)} was paid for delivered work${job.authorizedCents > job.capturedCents ? ` and ${formatCents(job.authorizedCents - job.capturedCents)} was released back to you` : ""}.`
+                  : "This job was cancelled before it was funded. Nothing was charged."}
               </p>
               <div className="mt-4">
                 <MoneyBar totalCents={job.totalCents} authorizedCents={job.authorizedCents} releasedCents={job.capturedCents} returnedCents={returnedCents(job)} />

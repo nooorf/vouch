@@ -133,6 +133,10 @@ export const jobs = pgTable(
     /** 29 days after the original authorization. */
     authExpiresAt: ts("auth_expires_at"),
 
+    /** The client asked to cancel before a deadline passed; only the freelancer's acceptance executes it. */
+    cancelRequestedAt: ts("cancel_requested_at"),
+    cancelRequestNote: text("cancel_request_note"),
+
     isDemo: boolean("is_demo").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

@@ -2,16 +2,14 @@ import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { env } from "@/lib/env";
 import { AgreementError } from "@/lib/jobs/agreement";
+import { currentMilestone } from "@/lib/jobs/cancel-rules";
 import { enqueue } from "@/lib/jobs/tasks";
 import { checkUrl, FetchBlockedError } from "@/lib/referee/fetch";
 import { parseRepoUrl } from "@/lib/referee/github";
 
 type Milestone = typeof schema.milestones.$inferSelect;
 
-/** The milestone being worked on: the first one that isn't settled. */
-export function currentMilestone(milestones: Milestone[]): Milestone | undefined {
-  return [...milestones].sort((a, b) => a.position - b.position).find((m) => m.status !== "RELEASED" && m.status !== "CLOSED");
-}
+export { currentMilestone };
 
 /** Can the freelancer submit (or resubmit) this milestone right now? */
 export function canSubmit(m: Milestone, maxResubmissions: number): { ok: true } | { ok: false; reason: string } {

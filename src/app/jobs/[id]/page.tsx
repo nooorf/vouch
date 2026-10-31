@@ -14,6 +14,7 @@ import { Badge, Card, Container, LinkButton } from "@/components/ui";
 import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
 import { clientUrlFor } from "@/lib/jobs/agreement";
+import { cancelView } from "@/lib/jobs/cancel";
 import { stepIndex } from "@/lib/jobs/status";
 import { canSubmit, currentMilestone } from "@/lib/jobs/delivery";
 import { drainTasks } from "@/lib/jobs/runner";
@@ -21,6 +22,7 @@ import { tickJob } from "@/lib/jobs/tick";
 import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { formatCents, returnedCents } from "@/lib/money";
 import { requireUser } from "@/lib/session";
+import { FreelancerCancelPanel } from "./cancel-panel";
 import { ProposalActions } from "./proposal-actions";
 import { SubmitDelivery } from "./submit-delivery";
 
@@ -50,6 +52,8 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   const milestones = rows.map((r) => r.m);
   const current = currentMilestone(milestones);
   const submittable = (job.status === "FUNDED" || job.status === "IN_PROGRESS") && current ? canSubmit(current, job.maxResubmissions) : null;
+
+  const cancel = cancelView(job, milestones);
 
   const clientUrl = clientUrlFor(job);
   const clientPath = clientUrl ? new URL(clientUrl).pathname : null;
@@ -98,6 +102,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
             </Card>
           )}
           {clientProposal && beforeProposal && <VersionChanges changes={diffBriefs(beforeProposal.content, clientProposal.content)} fromVersion={beforeProposal.versionNo} />}
+          {cancel.live && <FreelancerCancelPanel jobId={job.id} view={cancel} />}
           <MilestoneList milestones={milestones} />
           {current && submittable?.ok && (
             <SubmitDelivery
@@ -176,6 +181,16 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
                 <h2 className="font-semibold">Funded</h2>
                 <p className="mt-2 text-sm text-muted">
                   PayPal is holding {formatCents(job.authorizedCents)} for this job. Deliver each milestone to get paid for it.
+                </p>
+              </>
+            )}
+            {job.status === "CANCELLED" && (
+              <>
+                <h2 className="font-semibold">Cancelled</h2>
+                <p className="mt-2 text-sm text-muted">
+                  {job.authorizedCents > 0
+                    ? `You were paid ${formatCents(job.capturedCents)}.${job.authorizedCents > job.capturedCents ? ` ${formatCents(job.authorizedCents - job.capturedCents)} went back to the client.` : ""}`
+                    : "This job was cancelled before it was funded."}
                 </p>
               </>
             )}

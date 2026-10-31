@@ -79,6 +79,22 @@ function describe(e: Event): string {
       return `re-checked M${p.position} after the dispute: ${String(p.verdict).replace("_", " ").toLowerCase()}`;
     case "job.completed":
       return `completed the job: ${money(p.releasedCents)} released${typeof p.returnedCents === "number" && p.returnedCents > 0 ? `, ${money(p.returnedCents)} returned to the client` : ""}`;
+    case "job.cancel_requested":
+      return `asked to cancel the job: “${p.note}”`;
+    case "job.cancel_withdrawn":
+      return "withdrew the request to cancel";
+    case "job.cancel_declined":
+      return "declined the request to cancel and kept working";
+    case "job.cancelled":
+      return `${p.by === "both" ? "agreed to cancel" : "cancelled"} the job${p.reason ? ` (${p.reason})` : ""}: ${money(p.releasedCents)} stays with the freelancer, ${money(p.returningCents)} goes back to the client`;
+    case "payment.voided":
+      return `released the unused ${money(p.amountCents)} hold back to the client`;
+    case "milestone.deadline_missed":
+      return `noted that M${p.position}'s deadline passed with nothing delivered; a grace period started`;
+    case "milestone.deadline_extended":
+      return `gave ${p.days} more ${p.days === 1 ? "day" : "days"} for M${p.position}`;
+    case "demo.skipped_to_deadline":
+      return `skipped ahead to M${p.position}'s deadline (demo)`;
     case "paypal.webhook":
       return webhookText(p);
     case "brief.agreed":

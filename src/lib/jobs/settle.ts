@@ -104,6 +104,8 @@ async function capture(jobId: string, milestoneId: string, targetTotal: number, 
   // 1. Reserve.
   const reserved = await db.transaction(async (tx) => {
     const [job] = await tx.select().from(schema.jobs).where(eq(schema.jobs.id, jobId)).for("update");
+    // Cancelled (or otherwise ended) while this release was on its way: never capture after a cancel.
+    if (job.status !== "FUNDED" && job.status !== "IN_PROGRESS") throw new AgreementError("This job has ended, so nothing more can be released.");
     const [m] = await tx.select().from(schema.milestones).where(eq(schema.milestones.id, milestoneId)).for("update");
     const [{ inFlight }] = await tx
       .select({ inFlight: sql<number>`coalesce(sum(${schema.payments.amountCents}), 0)::int` })
@@ -229,7 +231,8 @@ export async function completeIfDone(jobId: string) {
   const milestones = await db.select().from(schema.milestones).where(eq(schema.milestones.jobId, jobId));
   if (!milestones.length || !milestones.every((m) => SETTLED.has(m.status))) return;
   const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-  if (job.status === "COMPLETED") return;
+  // A cancelled job's milestones are all closed too; its hold is voided by voidCancelledHold.
+  if (job.status !== "FUNDED" && job.status !== "IN_PROGRESS") return;
 
   const remaining = job.authorizedCents - job.capturedCents;
   let voidedCents = 0;
