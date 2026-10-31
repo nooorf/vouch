@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="t d">
+  <title id="t">Vouch architecture</title>
+  <desc id="d">Freelancer, client and a scheduler talk to one Next.js app on Render. Inside: brief and agreement, funding and release, the referee, the AI judge, the policy engine, time-based rules, the tick and task queue, and the webhook receiver, all writing to an append-only ledger. Outside: PayPal Orders, Payments and Webhooks; Gemini and Groq; Kernel cloud browsers; Google PageSpeed; GitHub; and Neon Postgres.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#9aa1ad"/>
+    </marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7da2f5"/>
+    </marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+      .h { font-size: 15px; font-weight: 600; fill: #eceef1; }
+      .b { font-size: 12.5px; fill: #9aa1ad; }
+      .k { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; fill: #5d6370; }
+      .box { fill: #1b1f25; stroke: #272b32; }
+      .money { fill: #123129; stroke: #35c29f; stroke-opacity: 0.5; }
+      .ext { fill: #15181d; stroke: #272b32; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="760" rx="20" fill="#0d0f12"/>
+
+  <!-- People -->
+  <text x="40" y="70" class="k">PEOPLE</text>
+  <rect x="40" y="90" width="200" height="104" rx="12" class="ext"/>
+  <text x="58" y="120" class="h">Freelancer</text>
+  <text x="58" y="144" class="b">Drafts the brief, delivers</text>
+  <text x="58" y="162" class="b">milestones, sees evidence.</text>
+  <text x="58" y="180" class="b">Signed-cookie session.</text>
+
+  <rect x="40" y="216" width="200" height="104" rx="12" class="ext"/>
+  <text x="58" y="246" class="h">Client</text>
+  <text x="58" y="270" class="b">No account: a private link</text>
+  <text x="58" y="288" class="b">(hashed + encrypted). Pays,</text>
+  <text x="58" y="306" class="b">reviews, disputes, decides.</text>
+
+  <rect x="40" y="342" width="200" height="86" rx="12" class="ext"/>
+  <text x="58" y="372" class="h">Scheduler</text>
+  <text x="58" y="396" class="b">GitHub Actions, every</text>
+  <text x="58" y="414" class="b">10 min → /api/cron/tick</text>
+
+  <line x1="240" y1="142" x2="284" y2="142" stroke="#9aa1ad" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="240" y1="268" x2="284" y2="268" stroke="#9aa1ad" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="240" y1="385" x2="284" y2="385" stroke="#9aa1ad" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- App -->
+  <rect x="288" y="52" width="624" height="672" rx="16" fill="#15181d" stroke="#35c29f" stroke-opacity="0.35"/>
+  <text x="312" y="84" class="h" style="font-size:17px">Vouch · one Next.js 16 app on Render</text>
+  <text x="312" y="106" class="b">Server actions and route handlers; money and rules run only on the server.</text>
+
+  <rect x="312" y="124" width="282" height="104" rx="10" class="box"/>
+  <text x="328" y="150" class="h">Brief &amp; agreement</text>
+  <text x="328" y="172" class="b">AI drafts; client edits become edit</text>
+  <text x="328" y="190" class="b">operations applied in code. Both sides</text>
+  <text x="328" y="208" class="b">accept the same content hash.</text>
+
+  <rect x="606" y="124" width="282" height="104" rx="10" class="money"/>
+  <text x="622" y="150" class="h">Funding &amp; release</text>
+  <text x="622" y="172" class="b">Authorize once; partial captures per</text>
+  <text x="622" y="190" class="b">milestone; reserve → call → confirm,</text>
+  <text x="622" y="208" class="b">PayPal-Request-Id on every write.</text>
+
+  <rect x="312" y="240" width="282" height="104" rx="10" class="box"/>
+  <text x="328" y="266" class="h">Referee</text>
+  <text x="328" y="288" class="b">SSRF-safe fetch, 20 measured checks,</text>
+  <text x="328" y="306" class="b">real-browser render at phone and</text>
+  <text x="328" y="324" class="b">desktop size, prompt-injection scan.</text>
+
+  <rect x="606" y="240" width="282" height="104" rx="10" class="box"/>
+  <text x="622" y="266" class="h">AI judge</text>
+  <text x="622" y="288" class="b">Subjective criteria from page text,</text>
+  <text x="622" y="306" class="b">a screenshot or the repo. Every “yes”</text>
+  <text x="622" y="324" class="b">must quote; code verifies the quote.</text>
+
+  <rect x="312" y="356" width="282" height="104" rx="10" class="money"/>
+  <text x="328" y="382" class="h">Policy engine</text>
+  <text x="328" y="404" class="b">PASS / PARTIAL / FAIL / NEEDS_HUMAN</text>
+  <text x="328" y="422" class="b">with exact cents. Pure, tested code;</text>
+  <text x="328" y="440" class="b">the AI never decides an amount.</text>
+
+  <rect x="606" y="356" width="282" height="104" rx="10" class="box"/>
+  <text x="622" y="382" class="h">Rules over time</text>
+  <text x="622" y="404" class="b">Silence rule, one AI re-check per</text>
+  <text x="622" y="422" class="b">dispute, deadlines + grace, settle</text>
+  <text x="622" y="440" class="b">before PayPal's 29-day hold ends.</text>
+
+  <rect x="312" y="472" width="282" height="104" rx="10" class="box"/>
+  <text x="328" y="498" class="h">Tick + task queue</text>
+  <text x="328" y="520" class="b">Every page load and the cron bring a</text>
+  <text x="328" y="538" class="b">job up to date. Idempotent; crashed</text>
+  <text x="328" y="556" class="b">captures retried with the same id.</text>
+
+  <rect x="606" y="472" width="282" height="104" rx="10" class="box"/>
+  <text x="622" y="498" class="h">Webhook receiver</text>
+  <text x="622" y="520" class="b">Signature verified with PayPal;</text>
+  <text x="622" y="538" class="b">recorded once; confirms, rolls back</text>
+  <text x="622" y="556" class="b">or records what only PayPal knows.</text>
+
+  <rect x="312" y="588" width="576" height="112" rx="10" class="box"/>
+  <text x="328" y="614" class="h">Append-only ledger → activity, notices, receipts</text>
+  <text x="328" y="636" class="b">Every brief version, acceptance, check, verdict, capture, void and decision is an event.</text>
+  <text x="328" y="654" class="b">Both sides see the same history; notices and reminders are derived from it;</text>
+  <text x="328" y="672" class="b">receipts carry PayPal's own transaction ids.</text>
+
+  <!-- External services -->
+  <text x="960" y="70" class="k">SERVICES</text>
+  <rect x="960" y="90" width="280" height="130" rx="12" class="ext" stroke="#7da2f5" stroke-opacity="0.6"/>
+  <text x="978" y="120" class="h">PayPal (sandbox)</text>
+  <text x="978" y="144" class="b">Orders v2: create (AUTHORIZE), authorize</text>
+  <text x="978" y="162" class="b">Payments v2: capture, reauthorize, void</text>
+  <text x="978" y="180" class="b">Webhooks + signature verification</text>
+  <text x="978" y="198" class="b">JS SDK checkout buttons</text>
+
+  <rect x="960" y="236" width="280" height="70" rx="12" class="ext"/>
+  <text x="978" y="264" class="h">Gemini → Groq</text>
+  <text x="978" y="286" class="b">Free tiers; schema-validated output</text>
+
+  <rect x="960" y="322" width="280" height="70" rx="12" class="ext"/>
+  <text x="978" y="350" class="h">Kernel cloud browsers</text>
+  <text x="978" y="372" class="b">Render web apps as visitors see them</text>
+
+  <rect x="960" y="408" width="280" height="70" rx="12" class="ext"/>
+  <text x="978" y="436" class="h">Google PageSpeed</text>
+  <text x="978" y="458" class="b">Lighthouse scores and phone screenshot</text>
+
+  <rect x="960" y="494" width="280" height="70" rx="12" class="ext"/>
+  <text x="978" y="522" class="h">GitHub</text>
+  <text x="978" y="544" class="b">Delivered repo read at a pinned commit</text>
+
+  <rect x="960" y="604" width="280" height="96" rx="12" class="ext"/>
+  <text x="978" y="634" class="h">Neon Postgres</text>
+  <text x="978" y="656" class="b">Jobs, versions, milestones, evaluations,</text>
+  <text x="978" y="674" class="b">payments, events, tasks, notices (Drizzle)</text>
+
+  <!-- Links to services: straight arrows from the app's edge -->
+  <line x1="912" y1="140" x2="956" y2="140" stroke="#7da2f5" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="956" y1="172" x2="916" y2="172" stroke="#7da2f5" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ap)"/>
+  <text x="934" y="192" class="b" style="font-size:10.5px;fill:#7da2f5" text-anchor="middle">webhooks</text>
+  <line x1="912" y1="271" x2="956" y2="271" stroke="#9aa1ad" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="912" y1="357" x2="956" y2="357" stroke="#9aa1ad" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="912" y1="443" x2="956" y2="443" stroke="#9aa1ad" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="912" y1="529" x2="956" y2="529" stroke="#9aa1ad" stroke-width="1.5" marker-end="url(#a)"/>
+  <line x1="912" y1="652" x2="956" y2="652" stroke="#9aa1ad" stroke-width="1.5" marker-end="url(#a)"/>
+</svg>

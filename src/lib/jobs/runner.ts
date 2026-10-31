@@ -3,6 +3,7 @@ import "@/lib/referee/evaluate";
 import { settleExpiredWindow } from "./settle";
 import { registerTask } from "./tasks";
 
-registerTask("settle", settleExpiredWindow);
+// A closed window's verdict must execute eventually, so settling never gives up.
+registerTask("settle", settleExpiredWindow, undefined, { maxAttempts: Infinity });
 
 export { drainTasks } from "./tasks";

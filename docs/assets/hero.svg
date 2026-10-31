@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="t d">
+  <title id="t">Vouch: pay on proof</title>
+  <desc id="d">Freelance escrow on PayPal. An AI referee checks each delivery against the agreed brief; a milestone that partly meets it releases 90 dollars and holds 60 dollars until a fix.</desc>
+  <defs>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#35c29f" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#35c29f" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="held" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="10" height="10" fill="#e6a640"/>
+      <rect width="4" height="10" fill="#c98a2a"/>
+    </pattern>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="520" rx="20" fill="#0d0f12"/>
+  <rect width="1280" height="520" rx="20" fill="url(#glow)"/>
+
+  <!-- Wordmark -->
+  <rect x="64" y="64" width="44" height="44" rx="10" fill="#35c29f"/>
+  <path d="M75 87 l8 8 l15 -17" fill="none" stroke="#062a22" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="122" y="97" font-size="30" font-weight="700" fill="#eceef1">Vouch</text>
+
+  <!-- Headline -->
+  <text x="64" y="208" font-size="68" font-weight="700" fill="#eceef1" letter-spacing="-1.5">Pay on proof.</text>
+  <text x="64" y="262" font-size="24" fill="#9aa1ad">Freelance escrow on PayPal. An AI referee checks</text>
+  <text x="64" y="294" font-size="24" fill="#9aa1ad">every delivery against the brief both sides agreed,</text>
+  <text x="64" y="326" font-size="24" fill="#9aa1ad">and money moves only when the work does.</text>
+
+  <!-- Three promises -->
+  <g font-size="17" fill="#eceef1">
+    <circle cx="72" cy="392" r="5" fill="#35c29f"/>
+    <text x="88" y="398">Held by PayPal, not by a stranger</text>
+    <circle cx="72" cy="428" r="5" fill="#35c29f"/>
+    <text x="88" y="434">Evidence for every dollar released</text>
+    <circle cx="72" cy="464" r="5" fill="#35c29f"/>
+    <text x="88" y="470">The AI proposes, rules decide, people override</text>
+  </g>
+
+  <!-- Evaluation card -->
+  <g transform="translate(700 64)">
+    <rect width="516" height="392" rx="16" fill="#15181d" stroke="#272b32"/>
+    <text x="28" y="44" font-size="14" fill="#9aa1ad">M2 · Responsive and accessible</text>
+    <rect x="368" y="24" width="120" height="28" rx="14" fill="#33270f"/>
+    <text x="428" y="43" font-size="14" font-weight="600" fill="#e6a640" text-anchor="middle">Partly met</text>
+
+    <g font-size="15">
+      <line x1="28" y1="72" x2="488" y2="72" stroke="#272b32"/>
+      <text x="28" y="100" fill="#35c29f" font-weight="700">✓</text>
+      <text x="52" y="100" fill="#eceef1">Set up for phone screens</text>
+      <text x="488" y="100" fill="#9aa1ad" text-anchor="end" class="mono">viewport tag</text>
+      <line x1="28" y1="118" x2="488" y2="118" stroke="#272b32"/>
+      <text x="28" y="146" fill="#35c29f" font-weight="700">✓</text>
+      <text x="52" y="146" fill="#eceef1">Images have alt text</text>
+      <text x="488" y="146" fill="#9aa1ad" text-anchor="end" class="mono">12 of 12</text>
+      <line x1="28" y1="164" x2="488" y2="164" stroke="#272b32"/>
+      <text x="28" y="192" fill="#f2766b" font-weight="700">✗</text>
+      <text x="52" y="192" fill="#eceef1">Lighthouse accessibility ≥ 90</text>
+      <text x="488" y="192" fill="#f2766b" text-anchor="end" class="mono">score 71</text>
+      <line x1="28" y1="210" x2="488" y2="210" stroke="#272b32"/>
+      <text x="28" y="238" fill="#35c29f" font-weight="700">✓</text>
+      <text x="52" y="238" fill="#eceef1">Readable on a phone</text>
+      <text x="488" y="238" fill="#7da2f5" text-anchor="end">AI · quoted</text>
+      <line x1="28" y1="256" x2="488" y2="256" stroke="#272b32"/>
+    </g>
+
+    <!-- Money bar -->
+    <rect x="28" y="286" width="460" height="14" rx="7" fill="#272b32"/>
+    <rect x="28" y="286" width="276" height="14" rx="7" fill="#35c29f"/>
+    <rect x="304" y="286" width="184" height="14" fill="url(#held)"/>
+    <rect x="300" y="286" width="8" height="14" fill="#35c29f"/>
+    <path d="M481 286 h0 a7 7 0 0 1 7 7 a7 7 0 0 1 -7 7 z" fill="#e6a640"/>
+
+    <circle cx="34" cy="336" r="5" fill="#35c29f"/>
+    <text x="46" y="341" font-size="14" fill="#9aa1ad">Released to freelancer</text>
+    <text x="28" y="370" font-size="24" font-weight="700" fill="#eceef1" class="mono">$90</text>
+    <circle cx="270" cy="336" r="5" fill="#e6a640"/>
+    <text x="282" y="341" font-size="14" fill="#9aa1ad">Held until the fix</text>
+    <text x="264" y="370" font-size="24" font-weight="700" fill="#eceef1" class="mono">$60</text>
+  </g>
+
+  <text x="1216" y="492" font-size="13" fill="#5d6370" text-anchor="end">PayPal sandbox · no real money moves</text>
+</svg>

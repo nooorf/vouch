@@ -15,10 +15,16 @@ const LOCK_MINUTES = 5;
 
 type Handler = (refId: string) => Promise<void>;
 type FinalFailure = (refId: string, error: string) => Promise<void>;
-const handlers = new Map<TaskKind, { run: Handler; onFinalFailure?: FinalFailure }>();
+/** Longest wait between retries. */
+const MAX_BACKOFF_SECONDS = 600;
+const handlers = new Map<TaskKind, { run: Handler; onFinalFailure?: FinalFailure; maxAttempts: number }>();
 
-export function registerTask(kind: TaskKind, run: Handler, onFinalFailure?: FinalFailure) {
-  handlers.set(kind, { run, onFinalFailure });
+/**
+ * `maxAttempts: Infinity` for work that must eventually happen (moving money someone is owed):
+ * it keeps retrying, at most every 10 minutes, through a PayPal outage of any length.
+ */
+export function registerTask(kind: TaskKind, run: Handler, onFinalFailure?: FinalFailure, opts: { maxAttempts?: number } = {}) {
+  handlers.set(kind, { run, onFinalFailure, maxAttempts: opts.maxAttempts ?? MAX_ATTEMPTS });
 }
 
 /** Queue work once: the same dedupe key (default kind:refId) is never queued twice. */
@@ -50,14 +56,14 @@ async function runOne(task: Task) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[tasks] ${task.kind} ${task.refId} attempt ${task.attempts} failed: ${message}`);
-    const final = task.attempts >= MAX_ATTEMPTS;
+    const final = task.attempts >= (handler?.maxAttempts ?? MAX_ATTEMPTS);
     await db
       .update(schema.tasks)
       .set({
         status: final ? "failed" : "queued",
         lockedUntil: null,
         lastError: message.slice(0, 1000),
-        runAfter: sql`now() + make_interval(secs => ${30 * task.attempts})`,
+        runAfter: sql`now() + make_interval(secs => ${Math.min(30 * task.attempts, MAX_BACKOFF_SECONDS)})`,
       })
       .where(eq(schema.tasks.id, task.id));
     if (final) await handler?.onFinalFailure?.(task.refId!, message).catch((e) => console.error("[tasks] final-failure handler", e));
