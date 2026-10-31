@@ -1,7 +1,7 @@
 <!-- Before submitting: replace DEMO_URL and VIDEO_URL below with the Render URL and the YouTube link. -->
 <div align="center">
 
-<img src="docs/assets/hero.svg" alt="Vouch: pay on proof. Freelance escrow on PayPal. An AI referee checks every delivery against the agreed brief; a milestone that partly meets it releases $90 and holds $60 until a fix." width="100%">
+<img src="docs/assets/hero.svg" alt="Vouch: pay on proof. Freelance payments on PayPal. An AI referee checks every delivery against the agreed brief; a milestone that partly meets it releases $90 and holds $60 until a fix." width="100%">
 
 <br>
 
@@ -19,9 +19,9 @@
 
 ## Freelance work, paid on proof instead of trust
 
-**Vouch is escrow for freelance work, refereed by an AI that has to show its evidence.** The client's payment is held by PayPal. Every delivery is checked against the brief both sides agreed to. Money is released milestone by milestone: in full when the work passes, in part when it partly does, and not at all when it doesn't. Both sides see exactly why.
+**Vouch is pay-on-proof for freelance work, refereed by an AI that has to show its evidence.** The client's payment is held by PayPal. Every delivery is checked against the brief both sides agreed to. Money is released milestone by milestone: in full when the work passes, in part when it partly does, and not at all when it doesn't. Both sides see exactly why.
 
-**Who it's for.** Freelancers and clients who work directly with each other: agency work, referrals, clients met on LinkedIn, Discord or email, often across borders. Today they choose between trusting a stranger and moving the deal onto a marketplace that takes a cut and keeps the relationship. Vouch gives a direct deal the protection of escrow, without the marketplace.
+**Who it's for.** Freelancers and clients who work directly with each other: agency work, referrals, clients met on LinkedIn, Discord or email, often across borders. Today they choose between trusting a stranger and moving the deal onto a marketplace that takes a cut and keeps the relationship. Vouch gives a direct deal the protection of a held payment, without the marketplace.
 
 <table>
 <tr>
@@ -96,7 +96,7 @@ To run it yourself, see [Run it locally](#run-it-locally).
 
 ## Can you trust the referee?
 
-An escrow referee is only as good as its record on work it has never seen. We ran it, exactly as production runs it, on public websites and open-source repositories with realistic briefs, labelled by a person **before** the referee saw them.
+A referee that decides when money moves is only as good as its record on work it has never seen. We ran it, exactly as production runs it, on public websites and open-source repositories with realistic briefs, labelled by a person **before** the referee saw them.
 
 | Benchmark | Deliveries | Verdicts right | Criteria right | Money released that shouldn't have been |
 |---|---:|---:|---:|---:|

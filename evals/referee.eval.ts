@@ -165,7 +165,7 @@ Run ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC · commit \`$
 
 **What to read from this.** The held-out labels were frozen (and fingerprinted) before the referee saw those sites. Its first run (${HELDOUT_FIRST_RUN.verdicts} verdicts, ${HELDOUT_FIRST_RUN.criteria} criteria, ${HELDOUT_FIRST_RUN.overReleases} wrong release) and repeat runs found three general weaknesses, which we fixed for every site, not for these cases: each fix is a rule about web pages or code in general, tested with made-up examples. Nothing in the referee refers to a benchmark site. The development set shows the approach works on the sites that shaped it.
 
-**The column that matters most for an escrow** is the last one: a referee that wrongly withholds money can be corrected by the client's approval or a dispute, but one that wrongly releases money can't.
+**The column that matters most when money is on the line** is the last one: a referee that wrongly withholds money can be corrected by the client's approval or a dispute, but one that wrongly releases money can't.
 
 **What we don't claim.** This isn't a claim that the referee is right on every site or repository. ${sets.heldout.verdicts + sets.code.verdicts + sets.dev.verdicts} deliveries is a small sample, and the limits below are real. What the design guarantees instead: every measured check shows its evidence, AI "yes" answers must quote the page or the code, and anything the referee can't measure goes to a person instead of being guessed.
 

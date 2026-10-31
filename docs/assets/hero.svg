@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="t d">
   <title id="t">Vouch: pay on proof</title>
-  <desc id="d">Freelance escrow on PayPal. An AI referee checks each delivery against the agreed brief; a milestone that partly meets it releases 90 dollars and holds 60 dollars until a fix.</desc>
+  <desc id="d">Freelance payments on PayPal. An AI referee checks each delivery against the agreed brief; a milestone that partly meets it releases 90 dollars and holds 60 dollars until a fix.</desc>
   <defs>
     <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#35c29f" stop-opacity="0.16"/>
@@ -26,7 +26,7 @@
 
   <!-- Headline -->
   <text x="64" y="208" font-size="68" font-weight="700" fill="#eceef1" letter-spacing="-1.5">Pay on proof.</text>
-  <text x="64" y="262" font-size="24" fill="#9aa1ad">Freelance escrow on PayPal. An AI referee checks</text>
+  <text x="64" y="262" font-size="24" fill="#9aa1ad">Freelance payments on PayPal. An AI referee checks</text>
   <text x="64" y="294" font-size="24" fill="#9aa1ad">every delivery against the brief both sides agreed,</text>
   <text x="64" y="326" font-size="24" fill="#9aa1ad">and money moves only when the work does.</text>
 
