@@ -212,7 +212,18 @@ async function main() {
       await page.waitForFunction(() => document.querySelector('[role="alert"]')?.textContent?.includes("title"), { timeout: 15_000 });
     });
 
-    const text = (t: string, timeout = 15_000) => page.waitForFunction((x) => document.body.innerText.includes(x), { timeout }, t);
+    // Pages refresh themselves as windows close; a refresh mid-wait just means "look again".
+    const text = async (t: string, timeout = 15_000) => {
+      const deadline = Date.now() + timeout;
+      for (;;) {
+        try {
+          return await page.waitForFunction((x) => document.body.innerText.includes(x), { timeout: Math.max(1000, deadline - Date.now()) }, t);
+        } catch (err) {
+          if (Date.now() >= deadline || /ms exceeded/.test(String(err))) throw err;
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+    };
     const nav = (fn: () => Promise<void>) => Promise.all([page.waitForNavigation({ waitUntil: "networkidle0" }), fn()]);
 
     await step("Send v1 to the client", async () => {
@@ -361,13 +372,11 @@ async function main() {
       });
 
       const bodyHas = (t: string) => page.evaluate((x) => document.body.innerText.includes(x), t);
-      const verdictShown = () =>
-        page.waitForFunction(() => /Passed|Partly met|Not met|Needs a person/.test(document.body.innerText) && !document.body.innerText.includes("Checking the delivery"), { timeout: 180_000 });
-
       let m1Partial = false;
       await step("Silence rule: the review window closes and the verdict executes", async () => {
         // Demo review windows are short; with no client action, the verdict executes through PayPal.
-        await page.waitForFunction(() => /Released in full|stays held until a fix is accepted|Nothing released yet/.test(document.body.innerText), { timeout: 120_000 });
+        // The window itself is 2 minutes; allow for the PayPal capture after it closes.
+        await page.waitForFunction(() => /Released in full|stays held until a fix is accepted|Nothing released yet/.test(document.body.innerText), { timeout: 180_000 });
         m1Partial = !(await bodyHas("Released in full"));
       });
       await shot(page, "silence-release");
@@ -378,24 +387,44 @@ async function main() {
           await clickByText(page, "button", "Good site");
           if (await page.$("#delivery-repo")) await page.type("#delivery-repo", "https://github.com/sindresorhus/is");
           await clickByText(page, "button", "Resubmit for checking");
-          await page.waitForFunction(() => /attempt 2 of/.test(document.body.innerText) && !document.body.innerText.includes("Checking the delivery"), { timeout: 180_000 });
+          await page.waitForFunction(() => /try 2 of/.test(document.body.innerText) && !document.body.innerText.includes("Checking the delivery"), { timeout: 180_000 });
           await nav(() => clickByText(page, "a", "Client"));
           await clickContaining(page, "button", "Release");
           await text("Released in full", 60_000);
         });
       }
 
-      await step("M2: freelancer submits the flawed site and the referee finds its problems", async () => {
+      // Submit M2's flawed site as try `n` of `of`, and wait for that delivery's own verdict (a
+      // withdrawn earlier delivery is on the page too, so "M2 delivery" alone proves nothing).
+      const submitFlawed = async (label: string, n: number, of: number) => {
         await nav(() => clickByText(page, "a", "Freelancer"));
         await clickByText(page, "button", "Flawed site");
-        await clickByText(page, "button", "Submit for checking");
-        await page.waitForFunction(() => /M2 delivery/.test(document.body.innerText), { timeout: 30_000 });
-        await verdictShown();
+        await clickByText(page, "button", label);
+        await page.waitForFunction(
+          (header) => document.body.innerText.includes(header) && !document.body.innerText.includes("Checking the delivery"),
+          { timeout: 180_000 },
+          `M2 delivery · try ${n} of ${of}`,
+        );
+      };
+
+      await step("M2: freelancer submits the flawed site and the referee finds its problems", async () => {
+        await submitFlawed("Submit for checking", 1, 2);
         await text("viewport");
       });
 
-      await step("Client disputes M2, the AI re-checks, and the client holds it for a fix", async () => {
+      await step("Freelancer withdraws it and the client sees it was withdrawn", async () => {
+        await clickByText(page, "button", "Withdraw delivery");
+        await clickByText(page, "button", "Yes, withdraw it");
+        await text("You withdrew this delivery", 30_000);
+        await text("Try 2 of 2: your last one");
         await nav(() => clickByText(page, "a", "Client"));
+        await text("withdrew this delivery");
+      });
+
+      await step("Last try: the client disputes, the AI re-checks, and the client holds it", async () => {
+        await submitFlawed("Resubmit for checking", 2, 2);
+        await nav(() => clickByText(page, "a", "Client"));
+        // A "needs a person" verdict has no dispute: the client decides straight away.
         if (await bodyHas("Dispute this result")) {
           await clickByText(page, "button", "Dispute this result");
           await page.click('form input[type="checkbox"]');
@@ -409,11 +438,33 @@ async function main() {
       });
       await shot(page, "dispute-held");
 
-      await step("Client closes M2: the job completes and the unused hold goes back", async () => {
-        await clickContaining(page, "button", "Close this milestone");
-        await text("Receipt", 60_000);
-        await text("Unused hold released back to the client");
-        await text("Done.");
+      await step("Out of tries: only the client moves things on, and the next milestone stays closed", async () => {
+        await text("has used every try for M2", 30_000);
+        await text("End the project");
+        await text("Skip this milestone");
+        await nav(() => clickByText(page, "a", "Freelancer"));
+        await text("You've used every try for M2");
+        if (await bodyHas("Submit M3")) throw new Error("M3 opened while M2 was still undecided");
+        if (await bodyHas("Resubmit M2")) throw new Error("The freelancer can resubmit with no tries left");
+      });
+
+      await step("Client gives another try, and the freelancer uses it", async () => {
+        await nav(() => clickByText(page, "a", "Client"));
+        await clickContaining(page, "button", "another try");
+        await nav(() => clickByText(page, "a", "Freelancer"));
+        await text("Try 3 of 3", 30_000);
+        await submitFlawed("Resubmit for checking", 3, 3);
+      });
+
+      await step("Client stays silent: the review window closes and the client must decide", async () => {
+        // Two demo minutes, plus one extension when a person has to decide.
+        await nav(() => clickByText(page, "a", "Client"));
+        await text("has used every try for M2", 290_000);
+      });
+
+      await step("The decision time runs out: the project ends and the unpaid money goes back", async () => {
+        await text("Cancelled", 240_000);
+        await text("released back to you", 60_000);
       });
       await shot(page, "receipt");
       await nav(() => clickByText(page, "a", "Freelancer"));
@@ -427,7 +478,7 @@ async function main() {
 
     await step("Dashboard lists the job", async () => {
       await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle0" });
-      await text(buyerEmail && buyerPassword ? "completed" : "agreed");
+      await text(buyerEmail && buyerPassword ? "cancelled" : "agreed");
     });
 
     if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);

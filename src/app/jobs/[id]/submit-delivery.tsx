@@ -22,6 +22,8 @@ export function SubmitDelivery({
   wantsRepo,
   demo,
   resubmission,
+  tryNo,
+  tries,
 }: {
   jobId: string;
   milestoneId: string;
@@ -30,6 +32,9 @@ export function SubmitDelivery({
   wantsRepo: boolean;
   demo: boolean;
   resubmission: boolean;
+  /** Which try this delivery will be, and how many this milestone allows right now. */
+  tryNo: number;
+  tries: number;
 }) {
   const router = useRouter();
   const [url, setUrl] = useState("");
@@ -43,6 +48,10 @@ export function SubmitDelivery({
         {resubmission ? "Resubmit" : "Submit"} M{position}: {title}
       </h2>
       <p className="mt-1 text-sm text-muted">Give the live link. Vouch checks it against this milestone&apos;s criteria and shows both of you the evidence.</p>
+      <p className="mt-1 text-sm text-muted">
+        Try {tryNo} of {tries}
+        {tryNo >= tries ? ": your last one. After it, the client decides whether you get another." : "."}
+      </p>
 
       {demo && (
         <div className="mt-4">

@@ -10,7 +10,7 @@ import { formatCents } from "@/lib/money";
 
 type Event = Pick<typeof schema.events.$inferSelect, "id" | "type" | "source" | "payload">;
 type Job = Pick<typeof schema.jobs.$inferSelect, "id" | "status" | "fundingExpiresAt" | "agreedAt" | "isDemo" | "reviewWindowSeconds">;
-type Milestone = Pick<typeof schema.milestones.$inferSelect, "id" | "position" | "status" | "dueAt" | "reviewEndsAt">;
+type Milestone = Pick<typeof schema.milestones.$inferSelect, "id" | "position" | "status" | "dueAt" | "reviewEndsAt" | "decideBy">;
 
 export type Party = "freelancer" | "client";
 
@@ -77,9 +77,32 @@ export function noticesForEvent(e: Event, ctx: NoticeContext): Notice[] {
           ? "The check couldn't decide on its own. Look at the evidence and decide what to release."
           : `Review the evidence and approve or dispute. If you do nothing, ${release ? `${release} is released` : "nothing is released"} when the review window closes.`,
       );
-      to("freelancer", `${M} checked: it ${verdict}`, release ? `${release} is released when the client's review window closes, unless they dispute.` : "See the fix list. You can resubmit once it's fixed.");
+      const lastTry = p.triesLeft === 0;
+      to(
+        "freelancer",
+        `${M} checked: it ${verdict}`,
+        release
+          ? `${release} is released when the client's review window closes, unless they dispute.`
+          : lastTry
+            ? "See the fix list. That was your last try: once the review window closes, the client decides whether you get another."
+            : "See the fix list. You can resubmit once it's fixed, or withdraw this delivery to resubmit without waiting.",
+      );
       break;
     }
+    case "delivery.withdrawn":
+      to("client", `${M} delivery withdrawn`, `${ctx.freelancer} withdrew their delivery (try ${p.attempt}) before it settled. Nothing was released for it.`);
+      break;
+    case "milestone.awaiting_decision":
+      to(
+        "client",
+        `${M}: your decision is needed`,
+        `${ctx.freelancer} has used every try. Give another try, accept it as is, skip the milestone or end the project by ${when(p.decideBy)}. If you don't decide, the project ends and the unpaid money comes back to you.`,
+      );
+      to("freelancer", `${M}: the client decides now`, `You've used every try. The client has until ${when(p.decideBy)} to give you another, accept the work, skip the milestone or end the project.`);
+      break;
+    case "milestone.try_given":
+      to("freelancer", `Another try for ${M}`, `The client gave you another try (${p.extraTries} of ${p.of} extra). Fix what the check found and resubmit.`);
+      break;
     case "evaluation.failed":
       to("freelancer", `Couldn't check ${M}`, "Vouch will try again. If it keeps failing, check the delivery link works.");
       break;
@@ -116,6 +139,10 @@ export function noticesForEvent(e: Event, ctx: NoticeContext): Notice[] {
       break;
     case "job.cancelled": {
       const body = `${money(p.releasedCents)} stays with the freelancer; ${money(p.returningCents)} goes back to the client.`;
+      if (p.by === "system") {
+        for (const party of ["freelancer", "client"] as const) to(party, "The project ended", `${p.reason}, so the project ended. ${body}`);
+        break;
+      }
       if (p.by !== "client") to("client", "The job was cancelled", `${p.by === "both" ? `${ctx.freelancer} accepted your request.` : `${ctx.freelancer} cancelled.`} ${body}`);
       if (p.by === "client") to("freelancer", "The client cancelled the job", `${p.reason ?? "A deadline was missed."} ${body}`);
       break;
@@ -142,7 +169,15 @@ export function noticesForEvent(e: Event, ctx: NoticeContext): Notice[] {
 }
 
 /** Timed reminders due now. Each has a dedupe key tied to the moment it's about, so it's sent once. */
-export function dueReminders(job: Job, milestones: Milestone[], now: Date, ctx: NoticeContext, windowSeconds: number, graceSeconds: number): Notice[] {
+export function dueReminders(
+  job: Job,
+  milestones: Milestone[],
+  now: Date,
+  ctx: NoticeContext,
+  windowSeconds: number,
+  graceSeconds: number,
+  decisionSpanSeconds = windowSeconds,
+): Notice[] {
   const out: Notice[] = [];
   const t = now.getTime();
 
@@ -168,6 +203,19 @@ export function dueReminders(job: Job, milestones: Milestone[], now: Date, ctx: 
       out.push({ party: "client", kind: "remind.review", title: `M${m.position}: review closes soon`, body: `The review window closes ${when(m.reviewEndsAt)}. If you do nothing, the verdict executes.`, dedupeKey: `remind:review-soon:${key}` });
     } else if (t >= half && t < end) {
       out.push({ party: "client", kind: "remind.review", title: `M${m.position}: half of the review window left`, body: `Approve or dispute by ${when(m.reviewEndsAt)}. If you do nothing, the verdict executes.`, dedupeKey: `remind:review-half:${key}` });
+    }
+  }
+
+  // Out of tries: halfway through the client's decision time, and shortly before it ends the project.
+  for (const m of milestones) {
+    if (!m.decideBy || !["PENDING", "HELD", "PARTIAL_HELD"].includes(m.status)) continue;
+    const end = m.decideBy.getTime();
+    const span = decisionSpanSeconds * 1000;
+    const key = `${m.id}:${end}`;
+    if (t >= end - Math.min(3_600_000, span / 4) && t < end) {
+      out.push({ party: "client", kind: "remind.decide", title: `M${m.position}: decide soon`, body: `If you don't decide by ${when(m.decideBy)}, the project ends and the unpaid money comes back to you.`, dedupeKey: `remind:decide-soon:${key}` });
+    } else if (t >= end - span / 2 && t < end) {
+      out.push({ party: "client", kind: "remind.decide", title: `M${m.position}: your decision is still needed`, body: `Give another try, accept, skip or end the project by ${when(m.decideBy)}.`, dedupeKey: `remind:decide-half:${key}` });
     }
   }
 

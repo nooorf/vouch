@@ -15,11 +15,12 @@ import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
 import { env, hasFeature } from "@/lib/env";
 import { findJobByClientToken } from "@/lib/jobs/agreement";
-import { cancelView } from "@/lib/jobs/cancel";
+import { cancelRefundCents, cancelView } from "@/lib/jobs/cancel";
 import { drainTasks } from "@/lib/jobs/runner";
 import { choiceViews } from "@/lib/jobs/choice-views";
 import { choicesFor } from "@/lib/jobs/settle";
 import { tickJob } from "@/lib/jobs/tick";
+import { triesAllowed } from "@/lib/jobs/tries";
 import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { stepIndex } from "@/lib/jobs/status";
 import { formatCents, returnedCents } from "@/lib/money";
@@ -99,17 +100,25 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
           <MilestoneList milestones={milestones} />
           {[...rows].reverse().map(({ m, ev, delivery }) => {
             if (!ev || !delivery) return null;
-            const choices = choicesFor(m, ev, 1 + job.maxResubmissions - m.attempts);
+            const choices = choicesFor(m, ev, job.maxResubmissions);
             const canDispute = m.status === "REVIEW_WINDOW" && !m.reevaluated && ev.status === "done" && ev.verdict !== "NEEDS_HUMAN";
             return (
               <div key={ev.id} className="space-y-3">
-                <EvaluationCard m={m} ev={ev} delivery={delivery} viewer="client" freelancer={owner?.name ?? "the freelancer"} maxAttempts={1 + job.maxResubmissions} />
+                <EvaluationCard
+                  m={m}
+                  ev={ev}
+                  delivery={delivery}
+                  viewer="client"
+                  freelancer={owner?.name ?? "the freelancer"}
+                  maxAttempts={triesAllowed(job.maxResubmissions, m)}
+                  refundCents={cancelRefundCents(job)}
+                />
                 {choices.length > 0 && (
                   <ReviewPanel
                     token={token}
                     milestoneId={m.id}
                     position={m.position}
-                    choices={choiceViews(m, ev, choices)}
+                    choices={choiceViews(m, ev, choices, { freelancer: owner?.name ?? "the freelancer", refundCents: cancelRefundCents(job) })}
                     dispute={canDispute ? (ev.results ?? []).map((r) => ({ id: r.id, label: r.label, passed: r.passed })) : null}
                   />
                 )}

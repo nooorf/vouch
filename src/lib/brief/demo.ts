@@ -7,7 +7,7 @@ export const demoBrief: Brief = {
     "A one-page marketing site for a specialty coffee roastery: story, bean origins, wholesale info and a contact form.",
   currency: "USD",
   totalCents: 40000,
-  terms: { reviewWindowHours: 24, maxResubmissions: 2 },
+  terms: { reviewWindowHours: 24, maxResubmissions: 1 },
   milestones: [
     {
       id: "m1",

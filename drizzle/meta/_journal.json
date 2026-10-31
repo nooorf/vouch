@@ -36,6 +36,13 @@
       "when": 1793433803858,
       "tag": "0004_job_notice_cursor",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793475558513,
+      "tag": "0005_tries_and_withdrawals",
+      "breakpoints": true
     }
   ]
 }

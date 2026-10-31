@@ -16,7 +16,9 @@ import {
   GRACE_HOURS,
   type Allowed,
 } from "./cancel-rules";
+import { awaitingDecisionEvent } from "./delivery";
 import { assertTransition } from "./status";
+import { awaitingClientDecision, decideByFor } from "./tries";
 
 /**
  * Cancelling a funded job. Rules live in cancel-rules.ts. The job is marked CANCELLED first, under
@@ -42,7 +44,7 @@ function must(allowed: Allowed) {
   if (!allowed.ok) throw new AgreementError(allowed.reason);
 }
 
-type CancelledBy = "freelancer" | "client" | "both";
+type CancelledBy = "freelancer" | "client" | "both" | "system";
 
 async function markCancelled(tx: Tx, job: Job, milestones: Milestone[], by: CancelledBy, reason: string) {
   // A capture still in flight would race the void; it settles within seconds.
@@ -62,7 +64,7 @@ async function markCancelled(tx: Tx, job: Job, milestones: Milestone[], by: Canc
   await tx.insert(schema.events).values({
     jobId: job.id,
     type: "job.cancelled",
-    source: by === "client" ? "client" : "freelancer",
+    source: by === "client" ? "client" : by === "system" ? "system" : "freelancer",
     payload: { by, reason, releasedCents: job.capturedCents, returningCents: Math.max(0, job.authorizedCents - job.capturedCents) },
   });
 }
@@ -183,6 +185,59 @@ export async function clientCancel(token: string): Promise<void> {
     await markCancelled(tx, job, milestones, "client", `M${m.position} wasn't delivered by its deadline`);
   });
   await afterCancel(jobId);
+}
+
+/**
+ * End the project once the freelancer has used every try on the current milestone: by the client's
+ * choice, or ("system") because the client didn't decide by the deadline. What isn't released goes
+ * back to the client; later milestones never start.
+ */
+export async function endProject(jobId: string, by: "client" | "system"): Promise<boolean> {
+  let ended = false;
+  await db.transaction(async (tx) => {
+    const { job, milestones } = await lockJob(tx, jobId);
+    const m = currentMilestone(milestones);
+    const waiting = job.status === "IN_PROGRESS" && m && awaitingClientDecision(m, job.maxResubmissions);
+    if (!waiting) {
+      if (by === "client") throw new AgreementError("That option isn't available for this milestone any more. Reload the page.");
+      return;
+    }
+    if (by === "system" && (!m.decideBy || m.decideBy > new Date())) return;
+    const reason = by === "client" ? `The client ended the project after M${m.position} wasn't accepted` : `The client didn't decide on M${m.position} in time`;
+    await markCancelled(tx, job, milestones, by, reason);
+    ended = true;
+  });
+  if (ended) await afterCancel(jobId);
+  return ended;
+}
+
+/**
+ * Keep the current milestone's decision clock right: start it if the freelancer is out of tries
+ * (a backstop; settling and withdrawing start it straight away), clear it once that's no longer
+ * so, and end the project when it runs out.
+ */
+export async function checkDecisionDeadline(job: Job): Promise<string | null> {
+  if (job.status !== "IN_PROGRESS") return null;
+  const milestones = await db.select().from(schema.milestones).where(eq(schema.milestones.jobId, job.id));
+  const m = currentMilestone(milestones);
+  if (!m) return null;
+  const waiting = awaitingClientDecision(m, job.maxResubmissions);
+  if (waiting && !m.decideBy) {
+    const decideBy = decideByFor(job, new Date(), env().DEMO_REVIEW_WINDOW_SECONDS);
+    await db.transaction(async (tx) => {
+      await tx.update(schema.milestones).set({ decideBy }).where(eq(schema.milestones.id, m.id));
+      await tx.insert(schema.events).values(awaitingDecisionEvent(job.id, m, decideBy));
+    });
+    return `M${m.position}: decision clock started`;
+  }
+  if (!waiting && m.decideBy) {
+    await db.update(schema.milestones).set({ decideBy: null }).where(eq(schema.milestones.id, m.id));
+    return null;
+  }
+  if (waiting && m.decideBy && m.decideBy <= new Date()) {
+    return (await endProject(job.id, "system")) ? `ended: no decision on M${m.position}` : null;
+  }
+  return null;
 }
 
 /** Give the freelancer more time after a missed deadline. Later milestones move by the same amount. */

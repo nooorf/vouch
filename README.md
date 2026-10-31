@@ -87,7 +87,9 @@ To run it yourself, see [Run it locally](#run-it-locally).
 | What happens if… | Vouch's rule |
 |---|---|
 | The client never responds | When the review window closes, the verdict executes: passing work is paid. |
-| The work is only partly done | The share backed by passing criteria is released; the rest is held with a fix list. The freelancer can resubmit (twice by default). |
+| The work is only partly done | The share backed by passing criteria is released; the rest is held with a fix list. The freelancer has 2 tries per milestone by default. |
+| The freelancer submitted the wrong thing | They can withdraw it while it's being checked or reviewed and submit again straight away. It still counts as a try, so the AI can't be used as a free practice test. |
+| The freelancer runs out of tries | Only the client moves things on: give another try (up to 3 more), accept the work as is, skip the milestone, or end the project. The next milestone never opens by itself. If the client doesn't decide within 3 days, the project ends and the unpaid money goes back to them. |
 | The client disagrees with the referee | They name the criteria they dispute. Nothing is released while the AI checks once more with their objection; then the client decides. |
 | The AI can't tell | NEEDS_HUMAN: nothing is guessed. A person decides, and silence releases only the share backed by measured checks. |
 | A delivery tries to manipulate the AI | Instructions aimed at an AI grader, including hidden text and code comments, are detected in code and send the delivery to a person. |
@@ -189,10 +191,10 @@ The PayPal integration was written with **APIMatic's context plugin for the PayP
 </details>
 
 <details>
-<summary><b>Testing and quality</b>: 208 unit tests, AI evals, real-PayPal walk-through, held-out benchmark, CI</summary>
+<summary><b>Testing and quality</b>: 223 unit tests, AI evals, real-PayPal walk-through, held-out benchmark, CI</summary>
 <br>
 
-- **208 unit tests** (Vitest) for the policy engine, money math, captures and limits, cancellation and deadline rules, the 29-day hold, notices, webhook parsing, the SSRF guard, the injection detector, quote verification and the AI layer.
+- **223 unit tests** (Vitest) for the policy engine, money math, captures and limits, cancellation and deadline rules, tries and withdrawals, the 29-day hold, notices, webhook parsing, the SSRF guard, the injection detector, quote verification and the AI layer.
 - **AI evals** (`npm run eval`) run the real models on fixed cases: brief drafting, change proposals, the page judge, the code judge, and the referee benchmark. They caught real problems before users did, such as the AI weighting "the page loads" at a quarter of a milestone's pay.
 - **A browser walk-through** (`npm run e2e`) plays the whole demo against real PayPal sandbox payments: brief, negotiation, funding, delivery, evaluation, silence rule, dispute, partial release, completion and receipt.
 - **The referee benchmark** above, with frozen, fingerprinted labels.

@@ -198,8 +198,12 @@ export const milestones = pgTable(
     criteria: jsonb("criteria").$type<Criterion[]>().notNull(),
     status: milestoneStatus("status").notNull().default("PENDING"),
     releasedCents: integer("released_cents").notNull().default(0),
-    /** Number of submissions so far. */
+    /** Number of submissions so far, withdrawn ones included. */
     attempts: integer("attempts").notNull().default(0),
+    /** Extra tries the client gave after the freelancer used their own (at most CLIENT_EXTRA_TRIES). */
+    extraTries: integer("extra_tries").notNull().default(0),
+    /** When the freelancer is out of tries: the client decides by then, or the project ends. */
+    decideBy: ts("decide_by"),
     dueAt: ts("due_at"),
     currentEvaluationId: uuid("current_evaluation_id"),
     reviewEndsAt: ts("review_ends_at"),
@@ -227,6 +231,8 @@ export const deliveries = pgTable(
     repoUrl: text("repo_url"),
     note: text("note"),
     submittedAt: createdAt(),
+    /** The freelancer took this delivery back before it settled. It still counts as a try. */
+    withdrawnAt: ts("withdrawn_at"),
   },
   (t) => [uniqueIndex("deliveries_milestone_attempt_uq").on(t.milestoneId, t.attemptNo)],
 );

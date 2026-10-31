@@ -4,7 +4,7 @@ import { hasFeature } from "@/lib/env";
 import { paypal, paypalErrorInfo } from "@/lib/paypal/client";
 import { syncNotices } from "@/lib/notify";
 import { completeFunding } from "@/lib/paypal/funding";
-import { noteMissedDeadline, voidCancelledHold } from "./cancel";
+import { checkDecisionDeadline, noteMissedDeadline, voidCancelledHold } from "./cancel";
 import { handleHoldExpiry, jobsNearHoldExpiry } from "./hold-expiry";
 import { completeIfDone, queueExpiredWindows, recoverPendingCaptures } from "./settle";
 import { assertTransition } from "./status";
@@ -59,6 +59,12 @@ async function bringUpToDate(jobId: string): Promise<string[]> {
   if (job.status === "FUNDED" || job.status === "IN_PROGRESS") {
     // Near the end of PayPal's hold: final notice, then settle everything still open.
     done.push(...(await handleHoldExpiry(job)));
+    // Out of tries: the client's decision deadline (and ending the project when it passes).
+    const decision = await checkDecisionDeadline(job).catch((err) => {
+      console.warn("[tick] decision deadline", job.id, err);
+      return null;
+    });
+    if (decision) done.push(decision);
     // Closed review windows become "settle" tasks (run right after the response, or by the cron).
     const queued = await queueExpiredWindows(job.id);
     if (queued) done.push(`queued ${queued} settlement(s)`);
@@ -101,6 +107,12 @@ export async function dueJobIds(limit = 50): Promise<string[]> {
       ),
     )
     .limit(limit);
+  // Jobs whose client didn't decide in time after the freelancer ran out of tries.
+  const undecided = await db
+    .selectDistinct({ id: schema.milestones.jobId })
+    .from(schema.milestones)
+    .where(and(inArray(schema.milestones.status, ["PENDING", "HELD", "PARTIAL_HELD"]), lt(schema.milestones.decideBy, new Date())))
+    .limit(limit);
   const nearExpiry = await jobsNearHoldExpiry(limit);
-  return [...new Set([...unfunded, ...windows, ...unvoided, ...nearExpiry].map((r) => r.id))];
+  return [...new Set([...unfunded, ...windows, ...unvoided, ...undecided, ...nearExpiry].map((r) => r.id))];
 }

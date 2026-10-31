@@ -450,13 +450,13 @@ export function BriefEditor({ jobId, initial, editable, versionNo }: { jobId: st
               </span>
             </label>
             <label className="flex items-center justify-between gap-3 text-muted">
-              Resubmissions allowed
+              Freelancer&apos;s tries per milestone
               <IntInput
-                label="Resubmissions allowed"
-                value={brief.terms.maxResubmissions}
-                min={0}
-                max={5}
-                onChange={(maxResubmissions) => setBrief({ ...brief, terms: { ...brief.terms, maxResubmissions } })}
+                label="Freelancer's tries per milestone"
+                value={1 + brief.terms.maxResubmissions}
+                min={1}
+                max={6}
+                onChange={(tries) => setBrief({ ...brief, terms: { ...brief.terms, maxResubmissions: tries - 1 } })}
               />
             </label>
             <p className="text-xs text-muted">If the client doesn&apos;t respond within the window, the verdict executes automatically.</p>

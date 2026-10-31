@@ -16,11 +16,13 @@ import { Badge, Card, Container, LinkButton } from "@/components/ui";
 import { db, schema } from "@/db";
 import { diffBriefs } from "@/lib/brief/diff";
 import { clientUrlFor } from "@/lib/jobs/agreement";
-import { cancelView } from "@/lib/jobs/cancel";
+import { cancelRefundCents, cancelView } from "@/lib/jobs/cancel";
 import { stepIndex } from "@/lib/jobs/status";
 import { canSubmit, currentMilestone } from "@/lib/jobs/delivery";
 import { drainTasks } from "@/lib/jobs/runner";
 import { tickJob } from "@/lib/jobs/tick";
+import { holdPhase } from "@/lib/jobs/hold-rules";
+import { canWithdraw, triesAllowed, triesLeft } from "@/lib/jobs/tries";
 import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { formatCents, returnedCents } from "@/lib/money";
 import { listNotices, markNoticesRead } from "@/lib/notify";
@@ -28,6 +30,7 @@ import { requireUser } from "@/lib/session";
 import { FreelancerCancelPanel } from "./cancel-panel";
 import { ProposalActions } from "./proposal-actions";
 import { SubmitDelivery } from "./submit-delivery";
+import { WithdrawDelivery } from "./withdraw-delivery";
 
 export const metadata: Metadata = { title: "Job" };
 
@@ -119,11 +122,31 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
               wantsRepo={current.criteria.some((c) => (c.kind === "check" && ["repo_readme", "repo_fresh_commits", "ci_passing"].includes(c.checkId)) || (c.kind === "judged" && c.source === "code"))}
               demo={user.demo}
               resubmission={current.attempts > 0}
+              tryNo={current.attempts + 1}
+              tries={triesAllowed(job.maxResubmissions, current)}
+            />
+          )}
+          {current && job.status === "IN_PROGRESS" && canWithdraw(current).ok && holdPhase(job.authExpiresAt, new Date()) !== "settle" && (
+            <WithdrawDelivery
+              jobId={job.id}
+              milestoneId={current.id}
+              position={current.position}
+              tryNo={current.attempts}
+              triesLeft={triesLeft(job.maxResubmissions, current)}
             />
           )}
           {[...rows].reverse().map(({ m, ev, delivery }) =>
             ev && delivery ? (
-              <EvaluationCard key={ev.id} m={m} ev={ev} delivery={delivery} viewer="freelancer" freelancer="you" maxAttempts={1 + job.maxResubmissions} />
+              <EvaluationCard
+                key={ev.id}
+                m={m}
+                ev={ev}
+                delivery={delivery}
+                viewer="freelancer"
+                freelancer="you"
+                maxAttempts={triesAllowed(job.maxResubmissions, m)}
+                refundCents={cancelRefundCents(job)}
+              />
             ) : null,
           )}
           <BriefView brief={shown.content} />

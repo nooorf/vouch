@@ -201,6 +201,6 @@ export function normalizeDraft(raw: RawDraft, input: { totalCents: number; deadl
     currency: "USD",
     totalCents: input.totalCents,
     milestones: milestones.filter((m) => m.amountCents > 0),
-    terms: { reviewWindowHours: 24, maxResubmissions: 2 },
+    terms: { reviewWindowHours: 24, maxResubmissions: 1 },
   });
 }

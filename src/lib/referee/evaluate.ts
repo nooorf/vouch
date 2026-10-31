@@ -3,8 +3,10 @@ import { db, schema } from "@/db";
 import { describeCriterion } from "@/lib/brief/describe";
 import type { Criterion, JudgedCriterion } from "@/lib/brief/schema";
 import { env } from "@/lib/env";
+import { hasEarlierSettledDelivery } from "@/lib/jobs/delivery";
 import { clampWindowEnd } from "@/lib/jobs/hold-rules";
 import { registerTask } from "@/lib/jobs/tasks";
+import { statusWithoutLatest, triesLeft } from "@/lib/jobs/tries";
 import { LlmUnavailableError } from "@/lib/llm";
 import { evaluate, type CriterionResult, type Evaluation } from "@/lib/policy/policy";
 import { judgeCode, type CodeJudgeOutput, type CodeRef } from "./code-judge";
@@ -231,6 +233,7 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
   if (!row) throw new Error(`Evaluation ${evaluationId} not found`);
   const { evaluation, delivery, milestone, job } = row;
   if (evaluation.status === "done") return;
+  if (delivery.withdrawnAt && evaluation.kind === "initial") return; // taken back before it was checked
 
   await db.update(schema.evaluations).set({ status: "running" }).where(eq(schema.evaluations.id, evaluationId));
 
@@ -257,6 +260,10 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
   const now = new Date();
 
   await db.transaction(async (tx) => {
+    // Locked like a withdrawal, so the two can't cross: a withdrawn delivery keeps its results
+    // for the record but never opens a review window.
+    await tx.select({ id: schema.milestones.id }).from(schema.milestones).where(eq(schema.milestones.id, milestone.id)).for("update");
+    const [{ withdrawnAt }] = await tx.select({ withdrawnAt: schema.deliveries.withdrawnAt }).from(schema.deliveries).where(eq(schema.deliveries.id, delivery.id));
     await tx
       .update(schema.evaluations)
       .set({
@@ -276,6 +283,7 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
         finishedAt: now,
       })
       .where(eq(schema.evaluations.id, evaluationId));
+    if (withdrawnAt) return;
     const recheck = evaluation.kind === "reevaluation";
     await tx
       .update(schema.milestones)
@@ -302,6 +310,7 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
         suspicious: report.suspicious.flagged,
         model: judged?.model ?? null,
         ms: report.ms,
+        triesLeft: triesLeft(job.maxResubmissions, milestone),
       },
     });
   });
@@ -333,11 +342,12 @@ async function evaluationFailed(evaluationId: string, error: string) {
   }
   await db.transaction(async (tx) => {
     await tx.update(schema.evaluations).set({ status: "error", error: error.slice(0, 1000), finishedAt: new Date() }).where(eq(schema.evaluations.id, evaluationId));
-    if (m) {
-      // A failed check run doesn't use up one of the freelancer's attempts.
+    const [delivery] = m ? await tx.select().from(schema.deliveries).where(eq(schema.deliveries.id, ev.deliveryId)) : [];
+    if (m && !delivery?.withdrawnAt) {
+      // A failed check run doesn't use up one of the freelancer's tries.
       await tx
         .update(schema.milestones)
-        .set({ status: m.releasedCents > 0 ? "PARTIAL_HELD" : "PENDING", attempts: Math.max(0, m.attempts - 1) })
+        .set({ status: statusWithoutLatest(m, await hasEarlierSettledDelivery(tx, m.id, ev.deliveryId)), attempts: Math.max(0, m.attempts - 1) })
         .where(eq(schema.milestones.id, m.id));
       await tx.insert(schema.events).values({ jobId: m.jobId, milestoneId: m.id, type: "evaluation.failed", source: "system", payload: { position: m.position, error: error.slice(0, 300) } });
     }

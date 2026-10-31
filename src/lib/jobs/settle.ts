@@ -14,9 +14,13 @@ import {
   type Evaluation as PolicyEvaluation,
 } from "@/lib/policy/policy";
 import { AgreementError, findJobByClientToken, type Job } from "./agreement";
+import { endProject } from "./cancel";
+import { awaitingDecisionEvent } from "./delivery";
 import { clampWindowEnd } from "./hold-rules";
 import { assertTransition } from "./status";
 import { enqueue } from "./tasks";
+import { choicesFor } from "./choice-views";
+import { awaitingClientDecision, canGiveTry, CLIENT_EXTRA_TRIES, decideByFor } from "./tries";
 
 /**
  * Moving money. Every capture is reserved before PayPal is called (a pending payment row with a
@@ -211,11 +215,15 @@ async function release(job: Job, m: Milestone, targetTotal: number, how: string,
   const delta = await capture(job.id, m.id, targetTotal, `Vouch: ${job.title} · M${m.position} ${m.title}`);
   const [fresh] = await db.select().from(schema.milestones).where(eq(schema.milestones.id, m.id));
   const status = nextStatus ?? statusAfterRelease(fresh.amountCents, fresh.releasedCents);
+  // Held with every try used: the client's decision clock starts now.
+  const now = new Date();
+  const decideBy = awaitingClientDecision({ ...fresh, status }, job.maxResubmissions) ? decideByFor(job, now, env().DEMO_REVIEW_WINDOW_SECONDS) : null;
   await db.transaction(async (tx) => {
     await tx
       .update(schema.milestones)
-      .set({ status, reviewEndsAt: null, settledAt: status === "RELEASED" || status === "CLOSED" ? new Date() : null })
+      .set({ status, reviewEndsAt: null, decideBy, settledAt: status === "RELEASED" || status === "CLOSED" ? now : null })
       .where(eq(schema.milestones.id, m.id));
+    if (decideBy) await tx.insert(schema.events).values(awaitingDecisionEvent(job.id, m, decideBy));
     await tx.insert(schema.events).values({
       jobId: job.id,
       milestoneId: m.id,
@@ -334,25 +342,35 @@ async function clientMilestone(token: string, milestoneId: string) {
   return { job, m, ev: ev as Evaluation | undefined };
 }
 
-/** Which choices the client has right now for a milestone. */
-export function choicesFor(m: Milestone, ev: Evaluation | undefined, attemptsLeft: number): ClientChoice[] {
-  if (m.status === "REVIEW_WINDOW" && ev?.status === "done") {
-    return ev.verdict === "NEEDS_HUMAN" ? ["release_all", "release_measured", "hold"] : ["release_all"];
-  }
-  if (m.status === "DISPUTED" && m.reevaluated && ev?.status === "done") return ["release_all", "release_earned", "hold"];
-  // Held after a partial or failed check: release the rest, or close it (unreleased money goes back
-  // when the job completes). The freelancer can still resubmit while attempts are left.
-  void attemptsLeft;
-  if (m.status === "HELD" || m.status === "PARTIAL_HELD") return ["release_all", "close"];
-  return [];
-}
+export { choicesFor };
 
 export async function clientDecide(token: string, milestoneId: string, choice: ClientChoice): Promise<void> {
   const { job, m, ev } = await clientMilestone(token, milestoneId);
-  const attemptsLeft = 1 + job.maxResubmissions - m.attempts;
-  if (!choicesFor(m, ev, attemptsLeft).includes(choice)) throw new AgreementError("That option isn't available for this milestone any more. Reload the page.");
+  if (!choicesFor(m, ev, job.maxResubmissions).includes(choice)) throw new AgreementError("That option isn't available for this milestone any more. Reload the page.");
+  if (choice === "another_try") return giveAnotherTry(job.id, m.id);
+  if (choice === "end_project") {
+    await endProject(job.id, "client");
+    return;
+  }
   const target = targetForChoice(choice, { amountCents: m.amountCents, releasedCents: m.releasedCents, earnedCents: ev?.earnedCents ?? null, silenceReleaseCents: ev?.silenceReleaseCents ?? null });
   await release(job, m, target, `client: ${choice}`, choice === "close" ? "CLOSED" : undefined);
+}
+
+/** The client lets the freelancer try once more (at most CLIENT_EXTRA_TRIES times per milestone). */
+async function giveAnotherTry(jobId: string, milestoneId: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [job] = await tx.select().from(schema.jobs).where(eq(schema.jobs.id, jobId)).for("update");
+    const [m] = await tx.select().from(schema.milestones).where(eq(schema.milestones.id, milestoneId)).for("update");
+    if (!canGiveTry(m, job.maxResubmissions)) throw new AgreementError("That option isn't available for this milestone any more. Reload the page.");
+    await tx.update(schema.milestones).set({ extraTries: m.extraTries + 1, decideBy: null }).where(eq(schema.milestones.id, m.id));
+    await tx.insert(schema.events).values({
+      jobId,
+      milestoneId: m.id,
+      type: "milestone.try_given",
+      source: "client",
+      payload: { position: m.position, extraTries: m.extraTries + 1, of: CLIENT_EXTRA_TRIES },
+    });
+  });
 }
 
 export async function clientDispute(token: string, milestoneId: string, criterionIds: string[], note: string): Promise<void> {

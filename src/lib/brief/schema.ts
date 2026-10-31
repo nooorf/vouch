@@ -57,7 +57,8 @@ export const Milestone = z.object({
 
 export const Terms = z.object({
   reviewWindowHours: z.number().int().min(1).max(168).default(24),
-  maxResubmissions: z.number().int().min(0).max(5).default(2),
+  /** Redos the freelancer can submit on their own after the first delivery (so 1 + this tries). */
+  maxResubmissions: z.number().int().min(0).max(5).default(1),
 });
 
 export const Brief = z

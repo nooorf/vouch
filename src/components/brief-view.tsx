@@ -2,6 +2,7 @@ import { describeCriterion } from "@/lib/brief/describe";
 import { measuredShare } from "@/lib/brief/lint";
 import type { Brief } from "@/lib/brief/schema";
 import type { Change } from "@/lib/brief/diff";
+import { CLIENT_EXTRA_TRIES, DECISION_DAYS } from "@/lib/jobs/tries";
 import { formatCents } from "@/lib/money";
 import { Badge, Card } from "./ui";
 
@@ -66,9 +67,11 @@ export function BriefView({ brief }: { brief: Brief }) {
             If they don&apos;t respond, the verdict executes automatically.
           </li>
           <li>
-            The freelancer can resubmit a milestone up to <strong className="text-ink">{brief.terms.maxResubmissions} times</strong> after a partial or
-            failed review.
+            The freelancer has <strong className="text-ink">{1 + brief.terms.maxResubmissions} {brief.terms.maxResubmissions === 0 ? "try" : "tries"}</strong>{" "}
+            per milestone; withdrawing a delivery counts as one. After that, the client can give up to {CLIENT_EXTRA_TRIES} more, accept the work as is, skip
+            the milestone, or end the project. If they don&apos;t decide within {DECISION_DAYS} days, the project ends and the unpaid money goes back to them.
           </li>
+          <li>The next milestone starts only once this one is paid, or the client chooses to move on.</li>
           <li>A failed must-pass check releases nothing for that milestone, whatever the AI says.</li>
         </ul>
       </Card>

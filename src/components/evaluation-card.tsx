@@ -19,12 +19,55 @@ const verdictView: Record<Verdict, { label: string; tone: "brand" | "held" | "da
 
 const when = (d: Date | null) => (d ? d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC" : "");
 
-function MoneyOutcome({ ev, m, freelancer }: { ev: Evaluation; m: Milestone; freelancer: string }) {
+/** Out of tries: what the client can do, and what happens if they don't. Shown to both sides. */
+function DecisionNote({ m, viewer, freelancer, refundCents }: { m: Milestone; viewer: "freelancer" | "client"; freelancer: string; refundCents?: number }) {
+  if (!m.decideBy) return null;
+  const refund = refundCents !== undefined ? formatCents(refundCents) : "the unpaid money";
+  return (
+    <div className="mt-2 rounded-md border border-held/40 bg-held-soft px-3 py-2">
+      {viewer === "freelancer" ? (
+        <>
+          You&apos;ve used every try for M{m.position}. The client decides within <Countdown endsAt={m.decideBy.toISOString()} />: give you another try, accept
+          the work as is, skip the milestone, or end the project. If they don&apos;t decide, the project ends and {refund} goes back to them.
+        </>
+      ) : (
+        <>
+          {freelancer} has used every try for M{m.position}, so it&apos;s your call. Decide within <Countdown endsAt={m.decideBy.toISOString()} />; if you
+          don&apos;t, the project ends and {refund} comes back to you.
+        </>
+      )}
+    </div>
+  );
+}
+
+function MoneyOutcome({
+  ev,
+  m,
+  delivery,
+  viewer,
+  freelancer,
+  refundCents,
+}: {
+  ev: Evaluation;
+  m: Milestone;
+  delivery: Delivery;
+  viewer: "freelancer" | "client";
+  freelancer: string;
+  refundCents?: number;
+}) {
   const remaining = m.amountCents - m.releasedCents;
   const endsAt = m.reviewEndsAt ? <Countdown endsAt={m.reviewEndsAt.toISOString()} /> : null;
   let body: React.ReactNode = null;
 
-  if (m.status === "REVIEW_WINDOW") {
+  if (delivery.withdrawnAt) {
+    body = (
+      <>
+        {viewer === "freelancer" ? "You withdrew this delivery" : `${freelancer} withdrew this delivery`} before it settled, so nothing was released for it. It
+        counts as try {delivery.attemptNo}.
+        {m.status === "PARTIAL_HELD" ? ` ${formatCents(m.releasedCents)} from earlier deliveries stays released.` : ""}
+      </>
+    );
+  } else if (m.status === "REVIEW_WINDOW") {
     if (ev.verdict === "NEEDS_HUMAN") {
       body = (
         <>
@@ -67,12 +110,13 @@ function MoneyOutcome({ ev, m, freelancer }: { ev: Evaluation; m: Milestone; fre
     body = <>Closed by the client: {formatCents(m.releasedCents)} released; {formatCents(remaining)} goes back to the client.</>;
   }
   if (!body) return null;
-  const watching = (m.status === "REVIEW_WINDOW" || m.status === "DISPUTED") && m.reviewEndsAt;
+  // Start refreshing a little before a window or decision deadline closes, so the outcome shows up on its own.
+  const closesAt = (m.status === "REVIEW_WINDOW" || m.status === "DISPUTED") && m.reviewEndsAt ? m.reviewEndsAt : m.decideBy;
   return (
     <div className="rounded-lg bg-surface-2 px-4 py-3 text-sm">
-      {/* Start refreshing a little before the window closes, so the release shows up on its own. */}
-      {watching && <AutoRefresh seconds={4} from={new Date(m.reviewEndsAt!.getTime() - 60_000).toISOString()} />}
+      {closesAt && <AutoRefresh seconds={4} from={new Date(closesAt.getTime() - 60_000).toISOString()} />}
       {body}
+      <DecisionNote m={m} viewer={viewer} freelancer={freelancer} refundCents={refundCents} />
     </div>
   );
 }
@@ -150,6 +194,7 @@ export function EvaluationCard({
   viewer,
   freelancer,
   maxAttempts,
+  refundCents,
 }: {
   m: Milestone;
   ev: Evaluation;
@@ -157,21 +202,37 @@ export function EvaluationCard({
   viewer: "freelancer" | "client";
   freelancer: string;
   maxAttempts: number;
+  /** What the client gets back if the project ends now, for the out-of-tries note. */
+  refundCents?: number;
 }) {
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="text-sm text-muted">
-          M{m.position} delivery · attempt {delivery.attemptNo} of {maxAttempts}
+          M{m.position} delivery · try {Math.min(delivery.attemptNo, maxAttempts)} of {maxAttempts}
           {ev.kind === "reevaluation" ? " · re-check after the client's dispute" : ""}
         </p>
         <a href={delivery.url} target="_blank" rel="noopener noreferrer" className="block truncate font-medium text-brand hover:underline">
           {delivery.url}
         </a>
       </div>
-      {ev.status === "done" && ev.verdict && <Badge tone={verdictView[ev.verdict].tone}>{verdictView[ev.verdict].label}</Badge>}
+      <div className="flex flex-wrap items-center gap-2">
+        {delivery.withdrawnAt && <Badge tone="neutral">Withdrawn</Badge>}
+        {ev.status === "done" && ev.verdict && <Badge tone={verdictView[ev.verdict].tone}>{verdictView[ev.verdict].label}</Badge>}
+      </div>
     </div>
   );
+
+  if (delivery.withdrawnAt && ev.status !== "done") {
+    return (
+      <Card className="p-5">
+        {header}
+        <div className="mt-4">
+          <MoneyOutcome ev={ev} m={m} delivery={delivery} viewer={viewer} freelancer={freelancer} refundCents={refundCents} />
+        </div>
+      </Card>
+    );
+  }
 
   if (ev.status === "queued" || ev.status === "running") {
     return (
@@ -193,7 +254,7 @@ export function EvaluationCard({
       <Card className="p-5">
         {header}
         <p className="mt-4 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger">
-          The check couldn&apos;t finish{ev.error ? `: ${ev.error}` : "."} {viewer === "freelancer" ? "You can submit again; this didn't use up an attempt." : ""}
+          The check couldn&apos;t finish{ev.error ? `: ${ev.error}` : "."} {viewer === "freelancer" ? "You can submit again; this didn't use up a try." : ""}
         </p>
       </Card>
     );
@@ -210,7 +271,7 @@ export function EvaluationCard({
     <Card className="p-5">
       {header}
       <div className="mt-4 space-y-3">
-        <MoneyOutcome ev={ev} m={m} freelancer={freelancer} />
+        <MoneyOutcome ev={ev} m={m} delivery={delivery} viewer={viewer} freelancer={freelancer} refundCents={refundCents} />
         {ev.kind === "reevaluation" && m.disputeNote && (
           <blockquote className="border-l-2 border-info/50 pl-3 text-sm text-muted">Client&apos;s objection: “{m.disputeNote}”</blockquote>
         )}

@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { env } from "@/lib/env";
 import { graceSeconds } from "@/lib/jobs/cancel";
+import { decisionSeconds } from "@/lib/jobs/tries";
 import { dueReminders, noticesForEvent, type Notice, type Party } from "./notices";
 
 /**
@@ -28,7 +29,7 @@ export async function syncNotices(jobId: string, now = new Date()): Promise<numb
   const milestones = await db.select().from(schema.milestones).where(eq(schema.milestones.jobId, jobId));
   const windowSeconds = job.isDemo ? env().DEMO_REVIEW_WINDOW_SECONDS : job.reviewWindowSeconds;
 
-  const notices: Notice[] = [...events.flatMap((e) => noticesForEvent(e, ctx)), ...dueReminders(job, milestones, now, ctx, windowSeconds, graceSeconds(job))];
+  const notices: Notice[] = [...events.flatMap((e) => noticesForEvent(e, ctx)), ...dueReminders(job, milestones, now, ctx, windowSeconds, graceSeconds(job), decisionSeconds(job, env().DEMO_REVIEW_WINDOW_SECONDS))];
   let added = 0;
   if (notices.length) {
     const rows = await db

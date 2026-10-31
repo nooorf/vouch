@@ -59,7 +59,13 @@ function describe(e: Event): string {
     case "job.expired":
       return "expired the agreement: it wasn't funded in time";
     case "delivery.submitted":
-      return `submitted M${p.position} (attempt ${p.attempt}): ${p.url}`;
+      return `submitted M${p.position} (try ${p.attempt}): ${p.url}`;
+    case "delivery.withdrawn":
+      return `withdrew M${p.position}'s delivery (try ${p.attempt}) before it settled; nothing was released for it`;
+    case "milestone.awaiting_decision":
+      return `noted that every try for M${p.position} is used; the client decides by ${dateText(p.decideBy)}, or the project ends`;
+    case "milestone.try_given":
+      return `gave the freelancer another try on M${p.position} (${p.extraTries} of ${p.of} extra)`;
     case "evaluation.completed":
       return `checked M${p.position}: ${String(p.verdict).replace("_", " ").toLowerCase()}${typeof p.releaseNowCents === "number" && p.releaseNowCents > 0 ? `, ${money(p.releaseNowCents)} to release` : ""}${p.suspicious ? " (flagged: instructions aimed at the AI)" : ""}`;
     case "evaluation.failed":
@@ -87,7 +93,7 @@ function describe(e: Event): string {
     case "job.cancel_declined":
       return "declined the request to cancel and kept working";
     case "job.cancelled":
-      return `${p.by === "both" ? "agreed to cancel" : "cancelled"} the job${p.reason ? ` (${p.reason})` : ""}: ${money(p.releasedCents)} stays with the freelancer, ${money(p.returningCents)} goes back to the client`;
+      return `${p.by === "both" ? "agreed to cancel" : p.by === "system" ? "ended" : "cancelled"} the job${p.reason ? ` (${p.reason})` : ""}: ${money(p.releasedCents)} stays with the freelancer, ${money(p.returningCents)} goes back to the client`;
     case "payment.voided":
       return `released the unused ${money(p.amountCents)} hold back to the client`;
     case "milestone.deadline_missed":

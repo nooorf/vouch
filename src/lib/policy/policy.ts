@@ -298,7 +298,8 @@ export function statusAfterRelease(amountCents: number, releasedCents: number): 
   return releasedCents > 0 ? "PARTIAL_HELD" : "HELD";
 }
 
-export type ClientChoice = "release_all" | "release_earned" | "release_measured" | "hold" | "close";
+/** "another_try" and "end_project" move no money for this milestone; they're handled before any release. */
+export type ClientChoice = "release_all" | "release_earned" | "release_measured" | "hold" | "close" | "another_try" | "end_project";
 
 /**
  * The released total a client's choice leads to, from server-side numbers only.
@@ -318,6 +319,8 @@ export function targetForChoice(
       return clamp(p.releasedCents + (p.silenceReleaseCents ?? 0));
     case "hold":
     case "close":
+    case "another_try":
+    case "end_project":
       return p.releasedCents;
   }
 }

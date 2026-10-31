@@ -7,7 +7,7 @@ import { clientDecide, clientDispute } from "@/lib/jobs/settle";
 import type { ClientChoice } from "@/lib/policy/policy";
 
 type Result = { ok: true } | { ok: false; error: string };
-const CHOICES: ClientChoice[] = ["release_all", "release_earned", "release_measured", "hold", "close"];
+const CHOICES: ClientChoice[] = ["release_all", "release_earned", "release_measured", "hold", "close", "another_try", "end_project"];
 
 function fail(err: unknown): Result {
   if (err instanceof AgreementError) return { ok: false, error: err.message };

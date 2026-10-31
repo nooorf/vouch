@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { AgreementError } from "@/lib/jobs/agreement";
-import { submitDelivery } from "@/lib/jobs/delivery";
+import { submitDelivery, withdrawDelivery } from "@/lib/jobs/delivery";
 import { drainTasks } from "@/lib/jobs/runner";
 import { requireUser } from "@/lib/session";
 
@@ -18,4 +18,16 @@ export async function submitDeliveryAction(jobId: string, milestoneId: string, u
   // Check the delivery right after responding; page loads and the cron pick it up if this is cut short.
   after(() => drainTasks({ jobId }).catch((e) => console.error("[delivery] drain", e)));
   return { ok: true };
+}
+
+export async function withdrawDeliveryAction(jobId: string, milestoneId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireUser();
+  try {
+    await withdrawDelivery(user.id, String(jobId), String(milestoneId));
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof AgreementError) return { ok: false, error: err.message };
+    console.error("[withdraw]", err);
+    return { ok: false, error: "Something went wrong. Please try again." };
+  }
 }
