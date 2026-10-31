@@ -14,6 +14,7 @@ import {
   type Evaluation as PolicyEvaluation,
 } from "@/lib/policy/policy";
 import { AgreementError, findJobByClientToken, type Job } from "./agreement";
+import { clampWindowEnd } from "./hold-rules";
 import { assertTransition } from "./status";
 import { enqueue } from "./tasks";
 
@@ -298,7 +299,9 @@ export async function settleExpiredWindow(milestoneId: string): Promise<void> {
   if (outcome.action === "extend") {
     const seconds = job.isDemo ? windowSeconds(job) : outcome.hours * 3600;
     await db.transaction(async (tx) => {
-      await tx.update(schema.milestones).set({ windowExtended: true, reviewEndsAt: new Date(Date.now() + seconds * 1000) }).where(eq(schema.milestones.id, m.id));
+      // Never past the day before PayPal's hold ends.
+      const endsAt = clampWindowEnd(new Date(Date.now() + seconds * 1000), job.authExpiresAt, new Date());
+      await tx.update(schema.milestones).set({ windowExtended: true, reviewEndsAt: endsAt }).where(eq(schema.milestones.id, m.id));
       await tx.insert(schema.events).values({ jobId: job.id, milestoneId: m.id, type: "review.extended", source: "system", payload: { position: m.position, seconds } });
     });
     return;

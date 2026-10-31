@@ -13,6 +13,7 @@ const who: Record<Event["source"], string> = {
   system: "Vouch",
 };
 
+const dateText = (iso: unknown) => (typeof iso === "string" ? new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" }) : "");
 const money = (c: unknown) => (typeof c === "number" ? formatCents(c) : "");
 
 /** A verified PayPal webhook, worded as what PayPal confirmed. */
@@ -95,6 +96,13 @@ function describe(e: Event): string {
       return `gave ${p.days} more ${p.days === 1 ? "day" : "days"} for M${p.position}`;
     case "demo.skipped_to_deadline":
       return `skipped ahead to M${p.position}'s deadline (demo)`;
+    case "hold.ending_soon":
+      return `gave final notice: PayPal's hold on this payment ends ${dateText(p.expiresAt)}, and anything still open a day before is settled automatically`;
+    case "hold.settling": {
+      const list = (k: unknown) => (Array.isArray(k) ? k.map((n) => `M${n}`).join(", ") : "");
+      const parts = [list(p.closed) && `closed ${list(p.closed)} (not delivered in time; the money goes back to the client)`, list(p.cut) && `closed the review of ${list(p.cut)} by the silence rule`].filter(Boolean);
+      return `settled the job before PayPal's hold ends: ${parts.join("; ")}`;
+    }
     case "paypal.webhook":
       return webhookText(p);
     case "brief.agreed":

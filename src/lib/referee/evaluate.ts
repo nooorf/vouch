@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { describeCriterion } from "@/lib/brief/describe";
 import type { Criterion, JudgedCriterion } from "@/lib/brief/schema";
 import { env } from "@/lib/env";
+import { clampWindowEnd } from "@/lib/jobs/hold-rules";
 import { registerTask } from "@/lib/jobs/tasks";
 import { LlmUnavailableError } from "@/lib/llm";
 import { evaluate, type CriterionResult, type Evaluation } from "@/lib/policy/policy";
@@ -282,7 +283,7 @@ export async function evaluateDelivery(evaluationId: string): Promise<void> {
         // After a dispute's re-check the client decides; if they stay silent, the re-check's verdict executes.
         status: recheck ? "DISPUTED" : "REVIEW_WINDOW",
         currentEvaluationId: evaluationId,
-        reviewEndsAt: new Date(now.getTime() + reviewWindowSeconds(job) * 1000),
+        reviewEndsAt: clampWindowEnd(new Date(now.getTime() + reviewWindowSeconds(job) * 1000), job.authExpiresAt, now),
         windowExtended: false,
         reevaluated: recheck,
       })
@@ -324,7 +325,7 @@ async function evaluationFailed(evaluationId: string, error: string) {
       await tx.update(schema.evaluations).set({ status: "error", error: error.slice(0, 1000), finishedAt: new Date() }).where(eq(schema.evaluations.id, evaluationId));
       await tx
         .update(schema.milestones)
-        .set({ currentEvaluationId: original?.id ?? m.currentEvaluationId, reevaluated: true, reviewEndsAt: new Date(Date.now() + reviewWindowSeconds(job) * 1000) })
+        .set({ currentEvaluationId: original?.id ?? m.currentEvaluationId, reevaluated: true, reviewEndsAt: clampWindowEnd(new Date(Date.now() + reviewWindowSeconds(job) * 1000), job.authExpiresAt, new Date()) })
         .where(eq(schema.milestones.id, m.id));
       await tx.insert(schema.events).values({ jobId: m.jobId, milestoneId: m.id, type: "evaluation.failed", source: "system", payload: { position: m.position, error: error.slice(0, 300), recheck: true } });
     });

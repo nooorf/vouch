@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { desc, eq, inArray } from "drizzle-orm";
 import { BriefView, VersionChanges } from "@/components/brief-view";
 import { EvaluationCard } from "@/components/evaluation-card";
+import { HoldNotice } from "@/components/hold-notice";
 import { JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { MilestoneList } from "@/components/milestones";
 import { MoneyBar } from "@/components/money-bar";
@@ -90,6 +91,7 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
+          <HoldNotice job={job} />
           <MilestoneList milestones={milestones} />
           {[...rows].reverse().map(({ m, ev, delivery }) => {
             if (!ev || !delivery) return null;

@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { env } from "@/lib/env";
 import { AgreementError } from "@/lib/jobs/agreement";
 import { currentMilestone } from "@/lib/jobs/cancel-rules";
+import { holdPhase } from "@/lib/jobs/hold-rules";
 import { enqueue } from "@/lib/jobs/tasks";
 import { checkUrl, FetchBlockedError } from "@/lib/referee/fetch";
 import { parseRepoUrl } from "@/lib/referee/github";
@@ -12,7 +13,8 @@ type Milestone = typeof schema.milestones.$inferSelect;
 export { currentMilestone };
 
 /** Can the freelancer submit (or resubmit) this milestone right now? */
-export function canSubmit(m: Milestone, maxResubmissions: number): { ok: true } | { ok: false; reason: string } {
+export function canSubmit(m: Milestone, maxResubmissions: number, authExpiresAt: Date | null = null, now = new Date()): { ok: true } | { ok: false; reason: string } {
+  if (holdPhase(authExpiresAt, now) === "settle") return { ok: false, reason: "PayPal's hold on this payment ends within a day, so the job is being settled and new deliveries are closed." };
   if (!["PENDING", "PARTIAL_HELD", "HELD"].includes(m.status)) {
     return { ok: false, reason: m.status === "EVALUATING" ? "This delivery is being checked." : "This milestone is waiting on the client's review." };
   }
@@ -44,7 +46,7 @@ export async function submitDelivery(ownerId: string, jobId: string, milestoneId
     const milestones = await tx.select().from(schema.milestones).where(eq(schema.milestones.jobId, jobId)).orderBy(asc(schema.milestones.position));
     const m = currentMilestone(milestones);
     if (!m || m.id !== milestoneId) throw new AgreementError("Milestones are delivered in order. Reload the page.");
-    const allowed = canSubmit(m, job.maxResubmissions);
+    const allowed = canSubmit(m, job.maxResubmissions, job.authExpiresAt);
     if (!allowed.ok) throw new AgreementError(allowed.reason);
 
     const attemptNo = m.attempts + 1;

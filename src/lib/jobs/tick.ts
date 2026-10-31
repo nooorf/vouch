@@ -4,6 +4,7 @@ import { hasFeature } from "@/lib/env";
 import { paypal, paypalErrorInfo } from "@/lib/paypal/client";
 import { completeFunding } from "@/lib/paypal/funding";
 import { noteMissedDeadline, voidCancelledHold } from "./cancel";
+import { handleHoldExpiry, jobsNearHoldExpiry } from "./hold-expiry";
 import { completeIfDone, queueExpiredWindows, recoverPendingCaptures } from "./settle";
 import { assertTransition } from "./status";
 
@@ -44,6 +45,8 @@ export async function tickJob(jobId: string): Promise<string[]> {
     }
   }
   if (job.status === "FUNDED" || job.status === "IN_PROGRESS") {
+    // Near the end of PayPal's hold: final notice, then settle everything still open.
+    done.push(...(await handleHoldExpiry(job)));
     // Closed review windows become "settle" tasks (run right after the response, or by the cron).
     const queued = await queueExpiredWindows(job.id);
     if (queued) done.push(`queued ${queued} settlement(s)`);
@@ -86,5 +89,6 @@ export async function dueJobIds(limit = 50): Promise<string[]> {
       ),
     )
     .limit(limit);
-  return [...new Set([...unfunded, ...windows, ...unvoided].map((r) => r.id))];
+  const nearExpiry = await jobsNearHoldExpiry(limit);
+  return [...new Set([...unfunded, ...windows, ...unvoided, ...nearExpiry].map((r) => r.id))];
 }

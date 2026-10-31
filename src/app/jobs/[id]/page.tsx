@@ -6,6 +6,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { Activity } from "@/components/activity";
 import { BriefView, VersionChanges } from "@/components/brief-view";
 import { EvaluationCard } from "@/components/evaluation-card";
+import { HoldNotice } from "@/components/hold-notice";
 import { CopyLink, JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { MilestoneList } from "@/components/milestones";
 import { MoneyBar } from "@/components/money-bar";
@@ -51,7 +52,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   const shown = (job.agreedVersionId && versions.find((v) => v.id === job.agreedVersionId)) || latest;
   const milestones = rows.map((r) => r.m);
   const current = currentMilestone(milestones);
-  const submittable = (job.status === "FUNDED" || job.status === "IN_PROGRESS") && current ? canSubmit(current, job.maxResubmissions) : null;
+  const submittable = (job.status === "FUNDED" || job.status === "IN_PROGRESS") && current ? canSubmit(current, job.maxResubmissions, job.authExpiresAt) : null;
 
   const cancel = cancelView(job, milestones);
 
@@ -102,6 +103,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
             </Card>
           )}
           {clientProposal && beforeProposal && <VersionChanges changes={diffBriefs(beforeProposal.content, clientProposal.content)} fromVersion={beforeProposal.versionNo} />}
+          <HoldNotice job={job} />
           {cancel.live && <FreelancerCancelPanel jobId={job.id} view={cancel} />}
           <MilestoneList milestones={milestones} />
           {current && submittable?.ok && (
