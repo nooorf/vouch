@@ -2,6 +2,7 @@ import { and, eq, gt, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { hasFeature } from "@/lib/env";
 import { paypal, paypalErrorInfo } from "@/lib/paypal/client";
+import { syncNotices } from "@/lib/notify";
 import { completeFunding } from "@/lib/paypal/funding";
 import { noteMissedDeadline, voidCancelledHold } from "./cancel";
 import { handleHoldExpiry, jobsNearHoldExpiry } from "./hold-expiry";
@@ -14,6 +15,17 @@ import { assertTransition } from "./status";
  * Later stages (review windows, reauthorization) are added here.
  */
 export async function tickJob(jobId: string): Promise<string[]> {
+  const done = await bringUpToDate(jobId);
+  // Notices last, so they include whatever this tick just did.
+  const notices = await syncNotices(jobId).catch((err) => {
+    console.warn("[tick] notices failed", jobId, err);
+    return 0;
+  });
+  if (notices) done.push(`${notices} notice(s)`);
+  return done;
+}
+
+async function bringUpToDate(jobId: string): Promise<string[]> {
   const done: string[] = [];
   const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
   if (!job) return done;

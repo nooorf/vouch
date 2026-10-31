@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signOut, startDemo } from "@/app/actions/session";
+import { unreadForOwner } from "@/lib/notify";
 import { getCurrentUser } from "@/lib/session";
 import { Logo } from "./logo";
 import { Badge, Button, Container } from "./ui";
@@ -16,6 +17,7 @@ export function SandboxBanner() {
 
 export async function SiteHeader() {
   const user = await getCurrentUser();
+  const unread = user ? [...(await unreadForOwner(user.id).catch(() => new Map<string, number>())).values()].reduce((a, b) => a + b, 0) : 0;
   return (
     <header className="border-b border-line bg-surface/80 backdrop-blur supports-[backdrop-filter]:bg-surface/70">
       <Container className="flex h-16 items-center justify-between gap-4">
@@ -26,8 +28,13 @@ export async function SiteHeader() {
               How it works
             </Link>
             {user && (
-              <Link href="/dashboard" className="rounded-md px-3 py-2 text-muted hover:text-ink">
+              <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-muted hover:text-ink">
                 Dashboard
+                {unread > 0 && (
+                  <span className="rounded-full bg-brand px-1.5 text-xs font-medium text-brand-ink" aria-label={`${unread} new notices`}>
+                    {unread}
+                  </span>
+                )}
               </Link>
             )}
           </nav>

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   bigserial,
   boolean,
   index,
@@ -136,6 +137,8 @@ export const jobs = pgTable(
     /** The client asked to cancel before a deadline passed; only the freelancer's acceptance executes it. */
     cancelRequestedAt: ts("cancel_requested_at"),
     cancelRequestNote: text("cancel_request_note"),
+    /** Ledger events up to this id have been turned into notices. */
+    noticedThroughEventId: bigint("noticed_through_event_id", { mode: "number" }).notNull().default(0),
 
     isDemo: boolean("is_demo").notNull().default(false),
     createdAt: createdAt(),

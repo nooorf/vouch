@@ -5,6 +5,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { BriefView, VersionChanges } from "@/components/brief-view";
 import { EvaluationCard } from "@/components/evaluation-card";
 import { HoldNotice } from "@/components/hold-notice";
+import { Notices } from "@/components/notices";
 import { JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { MilestoneList } from "@/components/milestones";
 import { MoneyBar } from "@/components/money-bar";
@@ -22,6 +23,7 @@ import { tickJob } from "@/lib/jobs/tick";
 import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { stepIndex } from "@/lib/jobs/status";
 import { formatCents, returnedCents } from "@/lib/money";
+import { listNotices, markNoticesRead } from "@/lib/notify";
 import { getCurrentUser } from "@/lib/session";
 import { ClientCancelPanel } from "./cancel-panel";
 import { ClientActions } from "./client-actions";
@@ -39,14 +41,16 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
   await tickJob(found.id);
   after(() => drainTasks({ jobId: found.id }).catch((e) => console.error("[client page] drain", e)));
   // Independent reads in parallel: each is a network round trip to the database.
-  const [job, rows, [owner], versions, viewer, payments] = await Promise.all([
+  const [job, rows, [owner], versions, viewer, payments, notices] = await Promise.all([
     findJobByClientToken(token).then((j) => j!),
     milestonesWithEvaluations(found.id),
     db.select().from(schema.users).where(eq(schema.users.id, found.ownerId)),
     db.select().from(schema.briefVersions).where(eq(schema.briefVersions.jobId, found.id)).orderBy(desc(schema.briefVersions.versionNo)),
     getCurrentUser(),
     db.select().from(schema.payments).where(eq(schema.payments.jobId, found.id)),
+    listNotices(found.id, "client"),
   ]);
+  if (notices.some((n) => !n.readAt)) after(() => markNoticesRead(found.id, "client").catch((e) => console.error("[client page] notices", e)));
   const milestones = rows.map((r) => r.m);
   const e = env();
 
@@ -117,6 +121,11 @@ export default async function ClientPage(props: PageProps<"/c/[token]">) {
         </div>
 
         <aside className="lg:sticky lg:top-6 lg:self-start">
+          {notices.length > 0 && (
+            <div className="mb-4">
+              <Notices notices={notices} />
+            </div>
+          )}
           {job.status === "PROPOSED" && shown.proposedBy !== "client" && (
             <ClientActions
               token={token}

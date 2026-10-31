@@ -7,6 +7,7 @@ import { Activity } from "@/components/activity";
 import { BriefView, VersionChanges } from "@/components/brief-view";
 import { EvaluationCard } from "@/components/evaluation-card";
 import { HoldNotice } from "@/components/hold-notice";
+import { Notices } from "@/components/notices";
 import { CopyLink, JobTimeline, ViewSwitcher } from "@/components/job-bits";
 import { MilestoneList } from "@/components/milestones";
 import { MoneyBar } from "@/components/money-bar";
@@ -22,6 +23,7 @@ import { drainTasks } from "@/lib/jobs/runner";
 import { tickJob } from "@/lib/jobs/tick";
 import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { formatCents, returnedCents } from "@/lib/money";
+import { listNotices, markNoticesRead } from "@/lib/notify";
 import { requireUser } from "@/lib/session";
 import { FreelancerCancelPanel } from "./cancel-panel";
 import { ProposalActions } from "./proposal-actions";
@@ -40,14 +42,16 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   after(() => drainTasks({ jobId: id }).catch((e) => console.error("[job page] drain", e)));
 
   // Independent reads in parallel: each is a network round trip to the database.
-  const [[job], versions, rows, events, payments] = await Promise.all([
+  const [[job], versions, rows, events, payments, notices] = await Promise.all([
     db.select().from(schema.jobs).where(and(eq(schema.jobs.id, id), eq(schema.jobs.ownerId, user.id))),
     db.select().from(schema.briefVersions).where(eq(schema.briefVersions.jobId, id)).orderBy(desc(schema.briefVersions.versionNo)),
     milestonesWithEvaluations(id),
     db.select().from(schema.events).where(eq(schema.events.jobId, id)).orderBy(desc(schema.events.id)).limit(50),
     db.select().from(schema.payments).where(eq(schema.payments.jobId, id)),
+    listNotices(id, "freelancer"),
   ]);
   if (!job) notFound();
+  if (notices.some((n) => !n.readAt)) after(() => markNoticesRead(id, "freelancer").catch((e) => console.error("[job page] notices", e)));
   const latest = versions[0];
   const shown = (job.agreedVersionId && versions.find((v) => v.id === job.agreedVersionId)) || latest;
   const milestones = rows.map((r) => r.m);
@@ -126,6 +130,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          <Notices notices={notices} />
           <Card className="p-5">
             <p className="text-sm text-muted">Total</p>
             <p className="tabular mt-1 font-mono text-3xl font-semibold">{formatCents(job.totalCents)}</p>

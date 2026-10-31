@@ -5,6 +5,7 @@ import { MoneyBar } from "@/components/money-bar";
 import { Badge, Card, Container, LinkButton } from "@/components/ui";
 import { db, schema } from "@/db";
 import { formatCents, returnedCents } from "@/lib/money";
+import { syncNotices, unreadForOwner } from "@/lib/notify";
 import { requireUser } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -27,6 +28,10 @@ export default async function Dashboard() {
     .from(schema.jobs)
     .where(eq(schema.jobs.ownerId, user.id))
     .orderBy(desc(schema.jobs.createdAt));
+  // Pick up anything the client did since the freelancer last looked (cheap: no PayPal calls).
+  const live = jobs.filter((j) => !["COMPLETED", "CANCELLED", "EXPIRED"].includes(j.status));
+  await Promise.all(live.map((j) => syncNotices(j.id).catch(() => 0)));
+  const unread = await unreadForOwner(user.id);
 
   return (
     <Container className="py-10">
@@ -63,7 +68,10 @@ export default async function Dashboard() {
                 <Card className="p-5 transition-colors hover:border-brand/50">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="min-w-0 truncate font-semibold">{job.title}</h2>
-                    <Badge tone={statusTone[job.status]}>{job.status.replace("_", " ").toLowerCase()}</Badge>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {(unread.get(job.id) ?? 0) > 0 && <Badge tone="brand">{unread.get(job.id)} new</Badge>}
+                      <Badge tone={statusTone[job.status]}>{job.status.replace("_", " ").toLowerCase()}</Badge>
+                    </div>
                   </div>
                   <p className="tabular mt-1 font-mono text-sm text-muted">{formatCents(job.totalCents)}</p>
                   <div className="mt-4">
