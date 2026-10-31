@@ -13,7 +13,7 @@
 ![Render](https://img.shields.io/badge/Deploys%20on-Render-0d7a64?style=for-the-badge&labelColor=15181d&logo=render&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-5d6370?style=for-the-badge&labelColor=15181d)
 
-**[▶ 3-minute demo](VIDEO_URL) · [Try it live](DEMO_URL) · [How it works](#how-it-works) · [Results](#can-you-trust-the-referee) · [Architecture](#architecture)**
+**[▶ 3-minute demo](VIDEO_URL) · [Try it live](DEMO_URL) · [How it works](#how-it-works) · [Results](#can-you-trust-the-referee) · [Where the money goes](#where-the-money-goes) · [Architecture](#architecture)**
 
 </div>
 
@@ -120,6 +120,21 @@ Every dollar moves through PayPal's APIs, server-side, with amounts read from th
 | **Payments v2**: void | Returns the unused hold when a job completes, is cancelled, or runs into the 29-day limit. |
 | **Webhooks**: `verify-webhook-signature` | Approved checkouts, authorizations, captures (completed or denied), voids and refunds. Each event is verified with PayPal, recorded once, and reconciled with the same idempotent code the pages use. |
 | **JavaScript SDK** buttons | The client's checkout, with the order created and authorized on the server. |
+
+### Where the money goes
+
+**In this build, Vouch's own PayPal merchant account receives the captures, and each freelancer's earnings are tracked in the ledger.** The ideal is that PayPal pays the freelancer directly and the platform never holds funds. We tested that first, and it's the production path.
+
+| | Freelancer as payee (tested in sandbox) | Platform as payee (this build) |
+|---|---|---|
+| Authorize the full amount | ✓ | ✓ |
+| Partial captures, one per milestone | ✓ Money lands in the freelancer's PayPal account | ✓ |
+| Void the unused hold (cancel, completion, day 29) | ✗ `403 PERMISSION_DENIED` | ✓ |
+| Act on the freelancer's behalf (`PayPal-Auth-Assertion`) | ✗ `400`: needs partner onboarding | Not needed |
+
+Paying the freelancer directly works for every capture, but returning unused money to the client requires acting on the freelancer's behalf. That needs PayPal partner onboarding, which a hackathon app can't get. Without the void, a client could never get unused money back, so this build has the platform hold the funds and keeps every flow working.
+
+**In production:** freelancers onboard as merchants through **PayPal Multiparty** (Partner Referrals), and Vouch captures and voids on their behalf with an auth assertion. Money goes straight from the client's hold to the freelancer, and Vouch never holds it. Nothing else changes: the referee, the policy engine and the ledger are independent of who the payee is. You can reproduce the direct-capture test with `npm run smoke -- --payee`.
 
 ## Built with APIMatic
 
