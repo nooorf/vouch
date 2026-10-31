@@ -48,6 +48,31 @@ describe("applyOps", () => {
     expect(brief.milestones[0].criteria).toHaveLength(demoBrief.milestones[0].criteria.length);
   });
 
+  it("never changes weight or must-pass when an added check is merged into an existing one", () => {
+    const before = demoBrief.milestones[0].criteria.find((c) => c.kind === "check" && c.checkId === "has_text")!;
+    const { brief } = applyOps(demoBrief, [
+      { op: "add_criterion", milestoneId: "m1", kind: "check", checkId: "has_text", items: ["Shoreditch"], weight: 9, required: !before.required },
+    ]);
+    const after = brief.milestones[0].criteria.find((c) => c.id === before.id)!;
+    expect(after).toMatchObject({ weight: before.weight, required: before.required });
+  });
+
+  it("switches what a judged question is answered from, keeping the fields consistent", () => {
+    const judged = demoBrief.milestones.flatMap((m) => m.criteria).find((c) => c.kind === "judged")!;
+    const toCode = applyOps(demoBrief, [{ op: "update_criterion", criterionId: judged.id, judgeFrom: "code" }]).brief;
+    const coded = toCode.milestones.flatMap((m) => m.criteria).find((c) => c.id === judged.id)!;
+    expect(coded).toMatchObject({ source: "code", visual: false, weight: judged.weight, required: judged.required });
+    const was = judged.kind === "judged" && judged.visual ? "a screenshot" : "the page text";
+    expect(diffBriefs(demoBrief, toCode).filter((c) => c.text.includes("judged from")).map((c) => c.text)).toEqual([
+      `“${judged.kind === "judged" ? judged.rubric : ""}” is now judged from the code in the repo (was ${was})`,
+    ]);
+
+    const toShot = applyOps(toCode, [{ op: "update_criterion", criterionId: judged.id, judgeFrom: "screenshot" }]).brief;
+    const shot = toShot.milestones.flatMap((m) => m.criteria).find((c) => c.id === judged.id)!;
+    expect(shot).toMatchObject({ visual: true });
+    expect("source" in shot).toBe(false);
+  });
+
   it("rejects what doesn't fit and keeps the rest", () => {
     const { brief, applied, rejected } = applyOps(demoBrief, [
       { op: "remove_criterion", criterionId: "m1-http" },

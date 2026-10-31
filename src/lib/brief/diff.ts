@@ -12,6 +12,9 @@ export interface Change {
 const label = (m: Milestone, i: number) => `M${i + 1} ${m.title}`;
 const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
+/** What a judged question is answered from, in words (matches the brief editor's three choices). */
+const judgedFrom = (c: { visual?: boolean; source?: "page" | "code" }) => (c.source === "code" ? "the code in the repo" : c.visual ? "a screenshot" : "the page text");
+
 function diffCriteria(where: string, before: Criterion[], after: Criterion[], out: Change[]) {
   const prev = new Map(before.map((c) => [c.id, c]));
   const next = new Map(after.map((c) => [c.id, c]));
@@ -31,11 +34,8 @@ function diffCriteria(where: string, before: Criterion[], after: Criterion[], ou
     if (old.required !== c.required) {
       out.push({ where, kind: "changed", text: `“${describeCriterion(c)}” is ${c.required ? "now required" : "no longer required"}` });
     }
-    if (old.kind === "judged" && c.kind === "judged" && old.visual !== c.visual) {
-      out.push({ where, kind: "changed", text: `“${describeCriterion(c)}” ${c.visual ? "is now" : "is no longer"} judged from a screenshot` });
-    }
-    if (old.kind === "judged" && c.kind === "judged" && (old.source ?? "page") !== (c.source ?? "page")) {
-      out.push({ where, kind: "changed", text: `“${describeCriterion(c)}” is now judged from ${c.source === "code" ? "the code in the repo" : "the page"}` });
+    if (old.kind === "judged" && c.kind === "judged" && judgedFrom(old) !== judgedFrom(c)) {
+      out.push({ where, kind: "changed", text: `“${describeCriterion(c)}” is now judged from ${judgedFrom(c)} (was ${judgedFrom(old)})` });
     }
   }
 }

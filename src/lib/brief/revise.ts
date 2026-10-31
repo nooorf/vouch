@@ -43,7 +43,8 @@ export const EditOp = z.object({
   rubric: z.string().optional(),
   weight: z.number().optional(),
   required: z.boolean().optional(),
-  visual: z.boolean().optional(),
+  /** Judged questions: what the AI answers from (the same three choices as the brief editor). */
+  judgeFrom: z.enum(["page", "screenshot", "code"]).optional(),
   reviewWindowHours: z.number().optional(),
   maxResubmissions: z.number().optional(),
 });
@@ -85,7 +86,11 @@ export const REVISION_JSON_SCHEMA = {
           rubric: { type: "string" },
           weight: { type: "integer" },
           required: { type: "boolean" },
-          visual: { type: "boolean" },
+          judgeFrom: {
+            type: "string",
+            enum: ["page", "screenshot", "code"],
+            description: "Judged questions only: page = the page's visible text, screenshot = a screenshot of the page, code = the source code in the delivered GitHub repo",
+          },
           reviewWindowHours: { type: "integer" },
           maxResubmissions: { type: "integer" },
         },
@@ -103,6 +108,13 @@ export interface ApplyResult {
 }
 
 const toCents = (usd: number | undefined) => (typeof usd === "number" && Number.isFinite(usd) && usd > 0 ? Math.round(usd * 100) : null);
+/** Set what a judged question is answered from, keeping `visual` and `source` consistent. */
+function setJudgeFrom(c: Extract<Criterion, { kind: "judged" }>, from: "page" | "screenshot" | "code") {
+  c.visual = from === "screenshot";
+  if (from === "code") c.source = "code";
+  else delete c.source; // left out rather than "page", like the editor, so the hash stays stable
+}
+
 const clampWeight = (w: number | undefined, fallback: number) => Math.min(10, Math.max(1, Math.round(typeof w === "number" && Number.isFinite(w) ? w : fallback)));
 
 /** Deterministic: the same brief and ops always give the same result (ids included). */
@@ -230,9 +242,9 @@ export function applyOps(input: Brief, ops: EditOp[]): ApplyResult {
             reject("invalid settings for this check");
             break;
           }
+          // Only the settings change: a merged "add" never touches the existing check's weight or
+          // must-pass flag (a model once used it to quietly make a must-pass check optional).
           existing.params = params;
-          if (op.weight !== undefined) existing.weight = clampWeight(op.weight, existing.weight);
-          if (op.required !== undefined) existing.required = op.required;
           applied.push(`merged into ${existing.id}`);
           break;
         }
@@ -240,7 +252,9 @@ export function applyOps(input: Brief, ops: EditOp[]): ApplyResult {
         if (op.kind === "judged") {
           const rubric = op.rubric?.trim() ?? "";
           if (rubric.length >= 15) {
-            c = { kind: "judged", id: freshId(`${m.id}-x`), rubric: rubric.slice(0, 300), weight: clampWeight(op.weight, 2), required: op.required ?? false, visual: op.visual ?? false };
+            const judged: Extract<Criterion, { kind: "judged" }> = { kind: "judged", id: freshId(`${m.id}-x`), rubric: rubric.slice(0, 300), weight: clampWeight(op.weight, 2), required: op.required ?? false, visual: false };
+            setJudgeFrom(judged, op.judgeFrom ?? "page");
+            c = judged;
           }
         } else if (isCheckId(op.checkId)) {
           const params = checkParams(op.checkId, op);
@@ -272,7 +286,7 @@ export function applyOps(input: Brief, ops: EditOp[]): ApplyResult {
             if (r.length >= 15) c.rubric = r.slice(0, 300);
             else reject("question too short");
           }
-          if (op.visual !== undefined) c.visual = op.visual;
+          if (op.judgeFrom !== undefined) setJudgeFrom(c, op.judgeFrom);
         } else if (op.min !== undefined || op.maxKb !== undefined || op.items !== undefined) {
           const merged = { min: op.min ?? (c.params.min as number | undefined), maxKb: op.maxKb ?? (c.params.maxKb as number | undefined), items: op.items ?? ((c.params.fields ?? c.params.phrases) as string[] | undefined) };
           const params = checkParams(c.checkId, merged);
