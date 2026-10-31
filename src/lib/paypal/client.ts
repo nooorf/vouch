@@ -7,7 +7,7 @@ import {
 } from "@paypal/paypal-server-sdk";
 import { requireFeature } from "@/lib/env";
 
-let cached: { orders: OrdersController; payments: PaymentsController } | null = null;
+let cached: { client: Client; orders: OrdersController; payments: PaymentsController } | null = null;
 
 /**
  * Server-only PayPal controllers, built once per process.
@@ -43,8 +43,25 @@ export function paypal() {
     // No `logging` on purpose: any logging config makes the SDK print every request and response.
     // Failures surface through paypalErrorInfo() and our own logs instead.
   });
-  cached = { orders: new OrdersController(client), payments: new PaymentsController(client) };
+  cached = { client, orders: new OrdersController(client), payments: new PaymentsController(client) };
   return cached;
+}
+
+/** PayPal's REST base URL for calls the SDK doesn't cover (env() only allows the sandbox). */
+export const PAYPAL_API_BASE = "https://api-m.sandbox.paypal.com";
+
+let token: { value: string; expiresAt: number } | null = null;
+
+/**
+ * An OAuth access token for REST calls the SDK has no operation for (webhook verification).
+ * Fetched through the SDK's own auth manager, cached until a minute before it expires.
+ */
+export async function paypalAccessToken(): Promise<string> {
+  if (token && token.expiresAt > Date.now()) return token.value;
+  const t = await paypal().client.clientCredentialsAuthManager.fetchToken();
+  const expiresAt = t.expiry ? Number(t.expiry) * 1000 - 60_000 : Date.now() + 5 * 60_000;
+  token = { value: t.accessToken, expiresAt };
+  return t.accessToken;
 }
 
 /** PayPal wants decimal strings. We store integer cents everywhere else. */

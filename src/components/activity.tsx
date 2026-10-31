@@ -15,6 +15,21 @@ const who: Record<Event["source"], string> = {
 
 const money = (c: unknown) => (typeof c === "number" ? formatCents(c) : "");
 
+/** A verified PayPal webhook, worded as what PayPal confirmed. */
+function webhookText(p: Record<string, unknown>): string {
+  const amount = money(p.amountCents);
+  const text: Record<string, string> = {
+    "CHECKOUT.ORDER.APPROVED": "confirmed the client approved the checkout",
+    "PAYMENT.AUTHORIZATION.CREATED": `confirmed the ${amount} hold`,
+    "PAYMENT.AUTHORIZATION.VOIDED": "confirmed the rest of the hold was released back to the client",
+    "PAYMENT.CAPTURE.COMPLETED": `confirmed the ${amount} capture`,
+    "PAYMENT.CAPTURE.DENIED": `denied the ${amount} capture`,
+    "PAYMENT.CAPTURE.REFUNDED": `refunded ${amount} to the client`,
+  };
+  const what = text[String(p.eventType)] ?? `sent ${String(p.eventType)}`;
+  return `${what} (webhook, signature verified)${p.error ? `. Not applied: ${p.error}` : ""}`;
+}
+
 function describe(e: Event): string {
   const p = e.payload as Record<string, unknown>;
   switch (e.type) {
@@ -64,6 +79,8 @@ function describe(e: Event): string {
       return `re-checked M${p.position} after the dispute: ${String(p.verdict).replace("_", " ").toLowerCase()}`;
     case "job.completed":
       return `completed the job: ${money(p.releasedCents)} released${typeof p.returnedCents === "number" && p.returnedCents > 0 ? `, ${money(p.returnedCents)} returned to the client` : ""}`;
+    case "paypal.webhook":
+      return webhookText(p);
     case "brief.agreed":
       return `accepted brief v${p.version}. Both sides agreed on the same version.`;
     default:

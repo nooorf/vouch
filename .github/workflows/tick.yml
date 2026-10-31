@@ -1,0 +1,32 @@
+name: Tick
+
+# Backup scheduler for the deployed app: settles review windows and finishes funding for jobs
+# nobody is viewing. Free for public repos. It also keeps a free Render instance from sleeping.
+# Needs two repository secrets: APP_URL (e.g. https://vouch.onrender.com) and CRON_SECRET.
+on:
+  schedule:
+    - cron: "*/10 * * * *" # GitHub may run scheduled jobs a few minutes late
+  workflow_dispatch:
+
+concurrency:
+  group: tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call /api/cron/tick
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL or CRON_SECRET secret not set; skipping."
+            exit 0
+          fi
+          # A sleeping free instance can take about a minute to wake up.
+          curl --fail-with-body --silent --show-error --max-time 240 --retry 2 --retry-delay 20 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "${APP_URL%/}/api/cron/tick"

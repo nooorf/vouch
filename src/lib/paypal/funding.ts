@@ -122,7 +122,7 @@ async function createMilestones(tx: Tx, job: Job, fundedAt: Date) {
  * After the client approves in PayPal: authorize the order, check it holds exactly the agreed
  * total, and mark the job FUNDED. Safe to call more than once (button, page reload, cron).
  */
-export async function completeFunding(jobId: string, orderId: string, source: "client" | "system"): Promise<FundingResult> {
+export async function completeFunding(jobId: string, orderId: string, source: "client" | "system" | "webhook"): Promise<FundingResult> {
   const [job] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
   if (!job) throw new AgreementError("Job not found.");
   if (job.paypalOrderId !== orderId) throw new AgreementError("That payment doesn't belong to this job.");
