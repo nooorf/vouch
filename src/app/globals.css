@@ -1,61 +1,46 @@
 @import "tailwindcss";
 
-/* Design tokens. Components use these names, never raw colors. */
+/*
+ * Design tokens. Components use these names, never raw colors.
+ * Light only: a calm, near-white page where color is a signal, not decoration.
+ *   blue  = something you can do (buttons, links, focus)
+ *   green = money released / a check passed
+ *   amber = money held / waiting
+ *   red   = a problem that needs a person
+ */
 :root {
-  --bg: #f6f6f3;
+  --bg: #fbfbfb;
   --surface: #ffffff;
-  --surface-2: #f0f0ec;
-  --ink: #15171b;
-  --muted: #5d6370;
-  --line: #e3e3de;
+  --surface-2: #f4f4f5;
+  --ink: #1c2024;
+  --muted: #60646c;
+  --faint: #8b8d98;
+  --line: #e8e8ec;
+  --line-strong: #d9d9e0;
 
-  --brand: #0d7a64;
-  --brand-hover: #0a6553;
+  --brand: #1d6ee5;
+  --brand-hover: #155bc4;
   --brand-ink: #ffffff;
-  --brand-soft: #e2f1ec;
+  --brand-soft: #edf3fe;
 
   /* Money states */
-  --released: #0d7a64;
-  --held: #c27c14;
-  --held-soft: #fbf0dc;
-  --unfunded: #cfd3da;
+  --released: #0f7f4a;
+  --released-fill: #1a9c5c;
+  --released-soft: #e8f5ee;
+  --held: #a35f00;
+  --held-fill: #f0a83c;
+  --held-soft: #fff5e3;
+  --unfunded: #e4e4e9;
 
-  --danger: #b42318;
-  --danger-soft: #fdeceb;
-  --info: #2457c5;
-  --info-soft: #e8eefb;
+  --danger: #c42b1c;
+  --danger-soft: #fdefed;
+  --info: #1d6ee5;
+  --info-soft: #edf3fe;
 
-  --ring: #0d7a6455;
+  --ring: #1d6ee540;
+  --shadow-soft: 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-raised: 0 1px 2px rgb(16 24 40 / 0.04), 0 16px 40px -16px rgb(16 24 40 / 0.18);
   color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d0f12;
-    --surface: #15181d;
-    --surface-2: #1b1f25;
-    --ink: #eceef1;
-    --muted: #9aa1ad;
-    --line: #272b32;
-
-    --brand: #35c29f;
-    --brand-hover: #4fd2b0;
-    --brand-ink: #062a22;
-    --brand-soft: #123129;
-
-    --released: #35c29f;
-    --held: #e6a640;
-    --held-soft: #33270f;
-    --unfunded: #3a3f48;
-
-    --danger: #f2766b;
-    --danger-soft: #3a1714;
-    --info: #7da2f5;
-    --info-soft: #172240;
-
-    --ring: #35c29f66;
-    color-scheme: dark;
-  }
 }
 
 @theme inline {
@@ -64,25 +49,39 @@
   --color-surface-2: var(--surface-2);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-faint: var(--faint);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
   --color-brand-ink: var(--brand-ink);
   --color-brand-soft: var(--brand-soft);
   --color-released: var(--released);
+  --color-released-fill: var(--released-fill);
+  --color-released-soft: var(--released-soft);
   --color-held: var(--held);
+  --color-held-fill: var(--held-fill);
   --color-held-soft: var(--held-soft);
   --color-unfunded: var(--unfunded);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
+  --shadow-soft: var(--shadow-soft);
+  --shadow-raised: var(--shadow-raised);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 html {
   background: var(--bg);
+  scroll-padding-top: 5.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {
@@ -92,9 +91,21 @@ body {
   font-feature-settings: "ss01", "cv11";
 }
 
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+}
+
 /* Amounts line up in tables and bars. */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Big money figures: the loudest thing on a job page. */
+.amount {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
 }
 
 :focus-visible {
@@ -102,12 +113,41 @@ body {
   outline-offset: 2px;
 }
 
+/* A jump link landed here: briefly ring the target so the eye finds it. */
+:target {
+  animation: target-ring 1.6s ease-out 1;
+}
+@keyframes target-ring {
+  0% {
+    box-shadow: 0 0 0 4px var(--ring);
+  }
+  100% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :target {
+    animation: none;
+  }
+}
+
 /* Diagonal stripes mark money that is held, not yet released. */
 .held-stripes {
-  background-color: var(--held);
+  background-color: var(--held-fill);
   background-image: repeating-linear-gradient(
     135deg,
     transparent 0 6px,
-    rgb(255 255 255 / 0.22) 6px 12px
+    rgb(255 255 255 / 0.28) 6px 12px
   );
+}
+
+/* Folded sections: hide the default marker, rotate our own chevron. */
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+details[open] > summary .chevron {
+  transform: rotate(90deg);
 }

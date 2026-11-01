@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { answerCancelRequestAction, cancelJobAction } from "@/app/actions/cancel";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Countdown } from "@/components/countdown";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, Button, Card, fieldClass } from "@/components/ui";
 
 export interface FreelancerCancelView {
   deadline: "none" | "on_time" | "grace" | "overdue";
@@ -16,7 +16,7 @@ export interface FreelancerCancelView {
   refund: string;
 }
 
-const field = "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+const field = fieldClass;
 
 export function FreelancerCancelPanel({ jobId, view }: { jobId: string; view: FreelancerCancelView }) {
   const router = useRouter();
@@ -38,7 +38,7 @@ export function FreelancerCancelPanel({ jobId, view }: { jobId: string; view: Fr
 
   const m = view.position ? `M${view.position}` : "This milestone";
   const errorBox = error && (
-    <p role="alert" className="mt-3 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+    <p role="alert" className="mt-3 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
       {error}
     </p>
   );
@@ -46,8 +46,8 @@ export function FreelancerCancelPanel({ jobId, view }: { jobId: string; view: Fr
   return (
     <div className="space-y-4">
       {view.deadline === "grace" && (
-        <Card className="border-held/40 p-5">
-          <Badge tone="held">{m}&apos;s deadline passed</Badge>
+        <Card className="border-held-fill/50 p-5 sm:p-6">
+          <Badge tone="held" dot>{m}&apos;s deadline passed</Badge>
           <p className="mt-3 text-sm">
             Deliver within <Countdown endsAt={view.graceEndsAt!} />. After that the client can cancel and get the remaining {view.refund} back, or give you more time.
           </p>
@@ -55,16 +55,16 @@ export function FreelancerCancelPanel({ jobId, view }: { jobId: string; view: Fr
         </Card>
       )}
       {view.deadline === "overdue" && (
-        <Card className="border-danger/40 p-5">
-          <Badge tone="danger">{m} is overdue</Badge>
+        <Card className="border-danger/30 p-5 sm:p-6">
+          <Badge tone="danger" dot>{m} is overdue</Badge>
           <p className="mt-3 text-sm">The grace period has ended. The client can now cancel or extend the deadline. Delivering now still counts if they haven&apos;t cancelled.</p>
         </Card>
       )}
 
       {view.requestNote && (
-        <Card className="border-held/40 p-5">
-          <Badge tone="held">The client asked to cancel</Badge>
-          <blockquote className="mt-3 border-l-2 border-held/50 pl-3 text-sm text-pretty">{view.requestNote}</blockquote>
+        <Card className="border-held-fill/50 p-5 sm:p-6">
+          <Badge tone="held" dot>The client asked to cancel</Badge>
+          <blockquote className="mt-3 border-l-2 border-held-fill pl-3 text-sm text-pretty">{view.requestNote}</blockquote>
           <p className="mt-3 text-sm text-muted">Nothing changes unless you accept. Money already released stays yours.</p>
           {errorBox}
           {view.blocker ? (
@@ -83,7 +83,7 @@ export function FreelancerCancelPanel({ jobId, view }: { jobId: string; view: Fr
       )}
 
       {!view.requestNote && (
-        <Card className="p-5">
+        <Card className="p-5 sm:p-6">
           <h2 className="font-semibold">Can&apos;t finish?</h2>
           {view.blocker ? (
             <p className="mt-2 text-sm text-muted">{view.blocker}</p>

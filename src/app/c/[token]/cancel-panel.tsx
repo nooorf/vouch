@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { clientCancelAction, demoSkipToDeadlineAction, extendDeadlineAction, requestCancelAction, withdrawCancelRequestAction } from "@/app/actions/cancel";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Countdown } from "@/components/countdown";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, Button, Card, fieldClass } from "@/components/ui";
 
 export interface ClientCancelView {
   deadline: "none" | "on_time" | "grace" | "overdue";
@@ -20,7 +20,7 @@ export interface ClientCancelView {
   demo: boolean;
 }
 
-const field = "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+const field = fieldClass;
 const day = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC";
 
 export function ClientCancelPanel({ token, freelancer, view }: { token: string; freelancer: string; view: ClientCancelView }) {
@@ -43,7 +43,7 @@ export function ClientCancelPanel({ token, freelancer, view }: { token: string; 
 
   const m = view.position ? `M${view.position}` : "This milestone";
   const errorBox = error && (
-    <p role="alert" className="mt-3 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+    <p role="alert" className="mt-3 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
       {error}
     </p>
   );
@@ -63,8 +63,8 @@ export function ClientCancelPanel({ token, freelancer, view }: { token: string; 
 
   if (view.deadline === "overdue" && !view.blocker) {
     return (
-      <Card className="border-danger/40 p-5">
-        <Badge tone="danger">{m} is overdue</Badge>
+      <Card className="border-danger/30 p-5 sm:p-6">
+        <Badge tone="danger" dot>{m} is overdue</Badge>
         <p className="mt-3 text-sm">
           The deadline was {view.dueAt && day(view.dueAt)} and the grace period has ended with nothing delivered. You can cancel the job or give more time.
         </p>
@@ -93,8 +93,8 @@ export function ClientCancelPanel({ token, freelancer, view }: { token: string; 
 
   if (view.deadline === "grace" && !view.blocker) {
     return (
-      <Card className="border-held/40 p-5">
-        <Badge tone="held">{m}&apos;s deadline passed</Badge>
+      <Card className="border-held-fill/50 p-5 sm:p-6">
+        <Badge tone="held" dot>{m}&apos;s deadline passed</Badge>
         <p className="mt-3 text-sm">
           {freelancer} has <Countdown endsAt={view.graceEndsAt!} /> left to deliver. If nothing arrives by then, you can cancel and get {view.refund} back.
         </p>
@@ -106,14 +106,14 @@ export function ClientCancelPanel({ token, freelancer, view }: { token: string; 
   }
 
   return (
-    <Card className="p-5">
+    <Card className="p-5 sm:p-6">
       <h3 className="font-semibold">Cancelling</h3>
       {view.blocker ? (
         <p className="mt-2 text-sm text-muted">{view.blocker}</p>
       ) : view.requestNote ? (
         <>
           <p className="mt-2 text-sm">You asked {freelancer} to cancel. Nothing changes unless they accept.</p>
-          <blockquote className="mt-2 border-l-2 border-line pl-3 text-sm text-muted">{view.requestNote}</blockquote>
+          <blockquote className="mt-2 border-l-2 border-line-strong pl-3 text-sm text-muted">{view.requestNote}</blockquote>
           {errorBox}
           <Button type="button" variant="ghost" className="mt-3" disabled={pending} onClick={() => run(() => withdrawCancelRequestAction(token))}>
             Withdraw the request

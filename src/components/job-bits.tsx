@@ -9,21 +9,24 @@ import { Button } from "./ui";
 export function JobTimeline({ current: reached }: { current: number }) {
   const finished = reached === STEPS.length - 1;
   return (
-    <ol className="flex flex-wrap gap-x-1 gap-y-2 text-xs sm:text-sm">
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs sm:text-[13px]">
       {STEPS.map((s, i) => {
         const state = reached < 0 ? "off" : i <= reached ? "done" : i === reached + 1 && !finished ? "now" : "todo";
         return (
-          <li key={s.key} className="flex items-center gap-1">
-            <span
-              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${
-                state === "done" ? "bg-brand-soft text-brand" : state === "now" ? "bg-ink text-bg" : "bg-surface-2 text-muted"
-              }`}
-              aria-current={state === "now" ? "step" : undefined}
-            >
-              {state === "done" && <span aria-hidden="true">✓</span>}
-              {s.label}
+          <li key={s.key} className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5" aria-current={state === "now" ? "step" : undefined}>
+              {state === "done" ? (
+                <span className="flex size-4 items-center justify-center rounded-full bg-released-fill text-[9px] font-bold text-white" aria-hidden="true">
+                  ✓
+                </span>
+              ) : state === "now" ? (
+                <span className="size-4 rounded-full border-[5px] border-brand bg-surface" aria-hidden="true" />
+              ) : (
+                <span className="size-4 rounded-full border border-line-strong bg-surface" aria-hidden="true" />
+              )}
+              <span className={state === "now" ? "font-semibold text-ink" : state === "done" ? "text-ink" : "text-faint"}>{s.label}</span>
             </span>
-            {i < STEPS.length - 1 && <span className="text-muted/50" aria-hidden="true">›</span>}
+            {i < STEPS.length - 1 && <span className={`h-px w-4 sm:w-6 ${i < reached ? "bg-released-fill/60" : "bg-line-strong"}`} aria-hidden="true" />}
           </li>
         );
       })}
@@ -34,17 +37,18 @@ export function JobTimeline({ current: reached }: { current: number }) {
 export function CopyLink({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="flex gap-2">
+    <div className="flex items-center gap-1 rounded-full border border-line-strong bg-surface-2 p-1 pl-4">
       <input
         readOnly
         value={url}
         aria-label="Client link"
         onFocus={(e) => e.target.select()}
-        className="min-w-0 flex-1 rounded-lg border border-line bg-bg px-3 py-2 font-mono text-xs text-muted"
+        className="min-w-0 flex-1 bg-transparent font-mono text-xs text-muted outline-none"
       />
       <Button
         type="button"
-        variant="secondary"
+        variant={copied ? "secondary" : "primary"}
+        size="sm"
         onClick={async () => {
           await navigator.clipboard.writeText(url);
           setCopied(true);
@@ -59,10 +63,11 @@ export function CopyLink({ url }: { url: string }) {
 
 /** Demo only: hop between the freelancer's job page and the client's link. */
 export function ViewSwitcher({ active, freelancerHref, clientHref }: { active: "freelancer" | "client"; freelancerHref: string; clientHref: string | null }) {
-  const item = (on: boolean) => `rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${on ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`;
+  const item = (on: boolean) =>
+    `rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${on ? "bg-surface text-ink shadow-[0_1px_3px_rgb(16_24_40/0.12)]" : "text-muted hover:text-ink"}`;
   return (
-    <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface-2 p-1" role="group" aria-label="Demo view">
-      <span className="pl-2 text-xs font-medium uppercase tracking-wide text-muted">Demo view</span>
+    <div className="inline-flex items-center gap-1 rounded-full bg-surface-2 p-1" role="group" aria-label="Demo view: switch sides">
+      <span className="hidden pr-1 pl-3 text-xs text-muted sm:inline">Viewing as</span>
       <Link href={freelancerHref} className={item(active === "freelancer")} aria-current={active === "freelancer" ? "page" : undefined}>
         Freelancer
       </Link>

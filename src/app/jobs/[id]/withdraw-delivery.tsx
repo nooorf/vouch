@@ -24,7 +24,7 @@ export function WithdrawDelivery({ jobId, milestoneId, position, tryNo, triesLef
     });
 
   return (
-    <Card className="p-5">
+    <Card className="p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-semibold">Submitted the wrong thing?</h3>
@@ -39,7 +39,7 @@ export function WithdrawDelivery({ jobId, milestoneId, position, tryNo, triesLef
         )}
       </div>
       {confirming && (
-        <div className="mt-4 rounded-lg bg-surface-2 px-4 py-3 text-sm">
+        <div className="mt-4 rounded-xl bg-surface-2 px-4 py-3 text-sm">
           <p>
             {triesLeft > 0
               ? `You'll have ${triesLeft} ${triesLeft === 1 ? "try" : "tries"} left for M${position}. Nothing is released for this delivery, and the client sees it was withdrawn.`
@@ -56,7 +56,7 @@ export function WithdrawDelivery({ jobId, milestoneId, position, tryNo, triesLef
         </div>
       )}
       {error && (
-        <p role="alert" className="mt-3 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+        <p role="alert" className="mt-3 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
           {error}
         </p>
       )}

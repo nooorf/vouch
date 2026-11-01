@@ -16,12 +16,12 @@ export function MoneyBar({
   releasedCents: number;
   /** Voided back to the client when the job completed. */
   returnedCents?: number;
-  size?: "md" | "lg";
+  size?: "sm" | "md" | "lg";
 }) {
   const s = splitMoney({ totalCents, authorizedCents, releasedCents, returnedCents });
   const pct = (c: number) => (s.totalCents === 0 ? 0 : (c / s.totalCents) * 100);
   const segments = [
-    { key: "released", label: "Released", cents: s.releasedCents, className: "bg-released" },
+    { key: "released", label: "Released", cents: s.releasedCents, className: "bg-released-fill" },
     { key: "held", label: "Held in PayPal", cents: s.heldCents, className: "held-stripes" },
     s.returnedCents > 0
       ? { key: "returned", label: "Returned to client", cents: s.returnedCents, className: "bg-unfunded" }
@@ -35,25 +35,27 @@ export function MoneyBar({
       <div
         role="img"
         aria-label={`${formatCents(s.releasedCents)} released, ${formatCents(s.heldCents)} held, ${s.returnedCents ? `${formatCents(s.returnedCents)} returned` : `${formatCents(s.unfundedCents)} not funded`}, of ${formatCents(s.totalCents)}`}
-        className={`flex w-full gap-0.5 overflow-hidden rounded-full bg-surface-2 ${size === "lg" ? "h-4" : "h-2.5"}`}
+        className={`flex w-full gap-[3px] overflow-hidden rounded-full bg-surface-2 ${size === "lg" ? "h-3" : size === "sm" ? "h-1.5" : "h-2"}`}
       >
         {segments
           .filter((seg) => seg.cents > 0)
           .map((seg) => (
-            <div key={seg.key} className={`${seg.className} h-full transition-[width] duration-700`} style={{ width: `${pct(seg.cents)}%` }} />
+            <div key={seg.key} className={`${seg.className} h-full rounded-full transition-[width] duration-700`} style={{ width: `${pct(seg.cents)}%` }} />
           ))}
       </div>
-      <dl className={`mt-3 grid gap-2 text-sm ${segments.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
-        {segments.map((seg) => (
-          <div key={seg.key} className="min-w-0">
-            <dt className="flex items-start gap-1.5 leading-tight text-muted">
-              <span className={`mt-[3px] size-2.5 shrink-0 rounded-full ${seg.className}`} aria-hidden="true" />
-              <span>{seg.label}</span>
-            </dt>
-            <dd className="tabular mt-0.5 font-mono text-base font-medium text-ink">{formatCents(seg.cents)}</dd>
-          </div>
-        ))}
-      </dl>
+      {size !== "sm" && (
+        <dl className={`mt-4 grid gap-3 ${segments.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+          {segments.map((seg) => (
+            <div key={seg.key} className="min-w-0">
+              <dt className="flex items-center gap-1.5 text-xs leading-tight text-muted">
+                <span className={`size-2 shrink-0 rounded-full ${seg.className}`} aria-hidden="true" />
+                <span className="truncate">{seg.label}</span>
+              </dt>
+              <dd className={`amount mt-1 font-medium text-ink ${size === "lg" ? "text-lg" : "text-base"}`}>{formatCents(seg.cents)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </div>
   );
 }

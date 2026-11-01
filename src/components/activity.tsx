@@ -118,26 +118,54 @@ function describe(e: Event): string {
   }
 }
 
-/** The audit ledger, newest first. */
+function Entry({ e }: { e: Event }) {
+  return (
+    <li className="relative flex gap-3 pb-4 text-sm last:pb-0">
+      <span className="relative z-10 mt-1.5 size-2 shrink-0 rounded-full border border-line-strong bg-surface" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="text-pretty">
+          <span className="font-medium">{who[e.source]}</span> <span className="text-muted">{describe(e)}</span>
+        </p>
+        <time dateTime={e.createdAt.toISOString()} className="text-xs text-faint">
+          {e.createdAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC
+        </time>
+      </div>
+    </li>
+  );
+}
+
+const rail = "relative before:absolute before:top-2 before:bottom-2 before:left-[3.5px] before:w-px before:bg-line";
+
+/** The audit ledger, newest first. The latest few show; the rest fold away. */
 export function Activity({ events }: { events: Event[] }) {
+  if (!events.length) return null;
+  const SHOWN = 8;
+  const first = events.slice(0, SHOWN);
+  const rest = events.slice(SHOWN);
   return (
     <Card className="p-5">
       <h2 className="font-semibold">Activity</h2>
-      <ol className="mt-3 space-y-3">
-        {events.map((e) => (
-          <li key={e.id} className="flex gap-3 text-sm">
-            <span className="mt-1.5 size-2 shrink-0 rounded-full bg-unfunded" aria-hidden="true" />
-            <div className="min-w-0">
-              <p className="text-pretty">
-                <span className="font-medium">{who[e.source]}</span> {describe(e)}
-              </p>
-              <time dateTime={e.createdAt.toISOString()} className="text-xs text-muted">
-                {e.createdAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC
-              </time>
-            </div>
-          </li>
+      <p className="mt-0.5 text-xs text-muted">Every action, by whom. Nothing is edited after the fact.</p>
+      <ol className={`mt-4 ${rail}`}>
+        {first.map((e) => (
+          <Entry key={e.id} e={e} />
         ))}
       </ol>
+      {rest.length > 0 && (
+        <details className="mt-4">
+          <summary className="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-brand hover:text-brand-hover">
+            <span className="chevron inline-block transition-transform" aria-hidden="true">
+              ›
+            </span>
+            Show {rest.length} earlier
+          </summary>
+          <ol className={`mt-4 ${rail}`}>
+            {rest.map((e) => (
+              <Entry key={e.id} e={e} />
+            ))}
+          </ol>
+        </details>
+      )}
     </Card>
   );
 }

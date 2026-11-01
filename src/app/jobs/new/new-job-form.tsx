@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createJob, type NewJobState } from "@/app/actions/jobs";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, fieldClass } from "@/components/ui";
 import { EXAMPLE_JOB } from "@/lib/brief/example";
 
 
@@ -22,13 +22,13 @@ function DraftingCard() {
     return () => clearInterval(t);
   }, []);
   return (
-    <Card className="p-6" aria-live="polite">
-      <p className="font-medium">Gemini is drafting your brief…</p>
+    <Card className="p-6 shadow-raised sm:p-7" aria-live="polite">
+      <p className="font-semibold">Gemini is drafting your brief…</p>
       <ol className="mt-4 space-y-2 text-sm">
         {DRAFT_STEPS.map((label, i) => (
           <li key={label} className={`flex items-center gap-2 ${i > step ? "text-muted/60" : i === step ? "text-ink" : "text-muted"}`}>
             <span
-              className={`size-2 rounded-full ${i < step ? "bg-brand" : i === step ? "animate-pulse bg-held" : "bg-unfunded"}`}
+              className={`size-2 rounded-full ${i < step ? "bg-released-fill" : i === step ? "animate-pulse bg-brand" : "bg-unfunded"}`}
               aria-hidden="true"
             />
             {label}
@@ -51,7 +51,7 @@ function SubmitArea() {
   );
 }
 
-const field = "mt-1.5 w-full rounded-lg border border-line bg-surface px-3 py-2 text-ink placeholder:text-muted/70 focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+const field = `mt-1.5 ${fieldClass} text-base`;
 
 function FieldError({ message }: { message?: string }) {
   return message ? <p className="mt-1 text-sm text-danger">{message}</p> : null;
@@ -73,9 +73,9 @@ export function NewJobForm() {
   }
 
   return (
-    <form ref={formRef} action={action} className="space-y-6">
+    <form ref={formRef} action={action} className="space-y-8">
       {state.error && (
-        <p role="alert" className="rounded-lg border border-line bg-danger-soft px-4 py-3 text-sm text-danger">
+        <p role="alert" className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
           {state.error}
         </p>
       )}
@@ -85,7 +85,7 @@ export function NewJobForm() {
           <label htmlFor="description" className="font-medium">
             What&apos;s the job?
           </label>
-          <button type="button" onClick={fillExample} className="text-sm text-brand hover:underline">
+          <button type="button" onClick={fillExample} className="rounded-full px-2 py-1 text-sm font-medium text-brand hover:bg-brand-soft">
             Use the coffee roastery example
           </button>
         </div>
@@ -108,8 +108,8 @@ export function NewJobForm() {
             Total price (USD)
           </label>
           <div className="relative">
-            <span className="pointer-events-none absolute top-1/2 left-3 mt-[3px] -translate-y-1/2 text-muted">$</span>
-            <input id="priceUsd" name="priceUsd" type="number" inputMode="decimal" min={10} max={10000} step="0.01" required defaultValue={v.priceUsd} className={`${field} tabular pl-7 font-mono`} />
+            <span className="pointer-events-none absolute top-1/2 left-3.5 mt-[3px] -translate-y-1/2 text-muted">$</span>
+            <input id="priceUsd" name="priceUsd" type="number" inputMode="decimal" min={10} max={10000} step="0.01" required defaultValue={v.priceUsd} className={`${field} tabular pl-7`} />
           </div>
           <FieldError message={e.priceUsd} />
         </div>
@@ -117,7 +117,7 @@ export function NewJobForm() {
           <label htmlFor="deadlineDays" className="font-medium">
             Deadline (days after funding)
           </label>
-          <input id="deadlineDays" name="deadlineDays" type="number" min={1} max={25} step={1} required defaultValue={v.deadlineDays ?? "14"} className={`${field} tabular font-mono`} />
+          <input id="deadlineDays" name="deadlineDays" type="number" min={1} max={25} step={1} required defaultValue={v.deadlineDays ?? "14"} className={`${field} tabular`} />
           <FieldError message={e.deadlineDays} />
         </div>
         <div>

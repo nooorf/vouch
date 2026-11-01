@@ -10,8 +10,10 @@ export function HoldNotice({ job }: { job: { status: string; authExpiresAt: Date
   if (phase !== "notice" && phase !== "settle") return null;
   const t = holdTimeline(job.authExpiresAt)!;
   return (
-    <Card className="border-held/40 p-5">
-      <Badge tone="held">{phase === "settle" ? "Settling before PayPal's hold ends" : "PayPal's hold ends soon"}</Badge>
+    <Card className="border-held-fill/50 bg-held-soft/50 p-5 sm:p-6">
+      <Badge tone="held" dot>
+        {phase === "settle" ? "Settling before PayPal's hold ends" : "PayPal's hold ends soon"}
+      </Badge>
       <p className="mt-3 text-sm text-pretty">
         PayPal holds a payment for 29 days; this one ends {when(t.expiresAt)}.{" "}
         {phase === "settle" ? "Vouch is settling the job now" : `Anything still open on ${when(t.settleBy)} is settled automatically`} by the agreed rules: open reviews

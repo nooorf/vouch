@@ -67,6 +67,23 @@ async function clickContaining(page: Page, selector: string, text: string) {
   await (handle.asElement() as unknown as { click: () => Promise<void> }).click();
 }
 
+/**
+ * Make the client's decision on a milestone. With one option it's a plain button; with several,
+ * the client picks the option (a radio card) and then confirms. Matching ignores case.
+ */
+async function decide(page: Page, text: string) {
+  const handle = await page.waitForFunction(
+    (t) =>
+      [...document.querySelectorAll<HTMLElement>("label")].find((el) => el.querySelector('input[type="radio"]') && el.textContent?.toLowerCase().includes(t)) ??
+      [...document.querySelectorAll<HTMLButtonElement>("button")].find((el) => el.textContent?.toLowerCase().includes(t) && !el.disabled),
+    { timeout: 30_000 },
+    text.toLowerCase(),
+  );
+  const isOption = await page.evaluate((el) => (el as unknown as HTMLElement).tagName === "LABEL", handle);
+  await (handle.asElement() as unknown as { click: () => Promise<void> }).click();
+  if (isOption) await clickContaining(page, "button", "Confirm decision");
+}
+
 async function shot(page: Page, name: string) {
   if (!SHOTS) return;
   if (!existsSync(SHOTS)) mkdirSync(SHOTS, { recursive: true });
@@ -309,7 +326,7 @@ async function main() {
       console.log("  - Skipping PayPal funding: set DEMO_BUYER_EMAIL and DEMO_BUYER_PASSWORD in .env.local");
     } else {
       await step(`Client funds the job (${PAYPAL_MODE === "card" ? "sandbox test card" : "PayPal sandbox popup"})`, async () => {
-        await text("Fund the job to start the work.");
+        await text("Fund the job to start the work");
         let funded = false;
         if (PAYPAL_MODE !== "card") {
           try {
@@ -389,7 +406,7 @@ async function main() {
           await clickByText(page, "button", "Resubmit for checking");
           await page.waitForFunction(() => /try 2 of/.test(document.body.innerText) && !document.body.innerText.includes("Checking the delivery"), { timeout: 180_000 });
           await nav(() => clickByText(page, "a", "Client"));
-          await clickContaining(page, "button", "Release");
+          await decide(page, "release");
           await text("Released in full", 60_000);
         });
       }
@@ -433,7 +450,7 @@ async function main() {
           await text("The client disputed the result and the AI checked again", 180_000);
         }
         // If the window already closed, silence has held it for us.
-        if (await bodyHas("Hold for a fix")) await clickByText(page, "button", "Hold for a fix");
+        if (await bodyHas("Hold for a fix")) await decide(page, "Hold for a fix");
         await page.waitForFunction(() => /Nothing released yet|stays held until a fix is accepted/.test(document.body.innerText), { timeout: 60_000 });
       });
       await shot(page, "dispute-held");
@@ -450,7 +467,7 @@ async function main() {
 
       await step("Client gives another try, and the freelancer uses it", async () => {
         await nav(() => clickByText(page, "a", "Client"));
-        await clickContaining(page, "button", "another try");
+        await decide(page, "another try");
         await nav(() => clickByText(page, "a", "Freelancer"));
         await text("Try 3 of 3", 30_000);
         await submitFlawed("Resubmit for checking", 3, 3);
@@ -478,7 +495,7 @@ async function main() {
 
     await step("Dashboard lists the job", async () => {
       await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle0" });
-      await text(buyerEmail && buyerPassword ? "cancelled" : "agreed");
+      await text(buyerEmail && buyerPassword ? "Cancelled" : "Agreed");
     });
 
     if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);

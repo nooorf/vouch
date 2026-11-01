@@ -4,7 +4,7 @@ import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from "@pa
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { finishFunding, startFunding } from "@/app/actions/funding";
-import { Badge, Card } from "@/components/ui";
+import { Callout, Card } from "@/components/ui";
 import { formatCents } from "@/lib/money";
 
 interface Props {
@@ -12,6 +12,8 @@ interface Props {
   clientId: string;
   totalCents: number;
   fundBy: string | null;
+  /** One line on what was agreed, shown above the amount. */
+  agreedText?: string;
   demoBuyer: { email: string; password: string } | null;
 }
 
@@ -20,9 +22,9 @@ function Buttons({ token, onError, onDone }: { token: string; onError: (m: strin
   if (isRejected) return <p className="text-sm text-danger">PayPal couldn&apos;t load. Check your connection and reload the page.</p>;
   return (
     <>
-      {isPending && <div className="h-12 animate-pulse rounded-lg bg-surface-2" aria-label="Loading PayPal" />}
+      {isPending && <div className="h-12 animate-pulse rounded-full bg-surface-2" aria-label="Loading PayPal" />}
       <PayPalButtons
-        style={{ layout: "vertical", shape: "rect", label: "paypal", height: 45 }}
+        style={{ layout: "vertical", shape: "pill", label: "paypal", height: 45 }}
         createOrder={async () => {
           onError("");
           const res = await startFunding(token);
@@ -49,25 +51,37 @@ function Buttons({ token, onError, onDone }: { token: string; onError: (m: strin
   );
 }
 
-export function FundCard({ token, clientId, totalCents, fundBy, demoBuyer }: Props) {
+export function FundCard({ token, clientId, totalCents, fundBy, agreedText, demoBuyer }: Props) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
   return (
-    <Card className="p-5">
-      <Badge tone="brand">Agreed</Badge>
-      <p className="mt-3 text-sm text-muted">Fund the job to start the work.</p>
-      <p className="tabular mt-1 font-mono text-3xl font-semibold">{formatCents(totalCents)}</p>
-      <ul className="mt-4 space-y-1.5 text-sm text-muted">
-        <li>• PayPal <strong className="text-ink">holds</strong> the money. It isn&apos;t sent to anyone yet.</li>
-        <li>• Each milestone is paid only when its delivery passes the agreed checks, or when you approve it.</li>
-        <li>• Money that isn&apos;t earned is released back to you.</li>
-      </ul>
+    <Card className="border-brand/30 p-5 shadow-raised sm:p-6">
+      <p className="flex items-center gap-2 text-xs font-medium text-brand">
+        <span className="size-2 rounded-full bg-brand" aria-hidden="true" />
+        Fund the job
+      </p>
+      <p className="amount mt-2 text-4xl font-semibold">{formatCents(totalCents)}</p>
+      {agreedText && <p className="mt-2 text-sm text-pretty text-muted">{agreedText}</p>}
+      <ol className="mt-5 space-y-3 border-t border-line pt-5 text-sm">
+        {[
+          <>
+            PayPal <strong className="font-semibold">holds</strong> the money. It isn&apos;t sent to anyone yet.
+          </>,
+          <>Each milestone is paid only when its delivery passes the agreed checks, or when you approve it.</>,
+          <>Money that isn&apos;t earned is released back to you.</>,
+        ].map((t, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="tabular flex size-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[11px] font-semibold text-muted">{i + 1}</span>
+            <span className="text-pretty text-muted">{t}</span>
+          </li>
+        ))}
+      </ol>
 
-      <div className="mt-5" aria-live="polite">
+      <div className="mt-6" aria-live="polite">
         {status ? (
-          <p className="rounded-lg bg-brand-soft px-3 py-2 text-sm text-brand">{status}</p>
+          <Callout tone="ok">{status}</Callout>
         ) : (
           <PayPalScriptProvider
             options={{ clientId, intent: "authorize", currency: "USD", components: "buttons", disableFunding: "card,credit,paylater,venmo" }}
@@ -83,20 +97,20 @@ export function FundCard({ token, clientId, totalCents, fundBy, demoBuyer }: Pro
           </PayPalScriptProvider>
         )}
         {error && (
-          <p role="alert" className="mt-3 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+          <Callout tone="danger" role="alert" className="mt-3">
             {error}
-          </p>
+          </Callout>
         )}
       </div>
 
-      {fundBy && <p className="mt-3 text-xs text-muted">Fund by {fundBy}, or the agreement expires and nothing is charged.</p>}
+      {fundBy && <p className="mt-3 text-center text-xs text-muted">Fund by {fundBy}, or the agreement expires and nothing is charged.</p>}
 
       {demoBuyer && (
-        <div className="mt-4 rounded-lg border border-dashed border-line p-3 text-xs">
+        <div className="mt-5 rounded-xl border border-dashed border-line-strong p-4 text-xs">
           <p className="font-medium">Demo: pay with this PayPal sandbox buyer</p>
-          <p className="mt-1 font-mono text-muted">{demoBuyer.email}</p>
-          <p className="font-mono text-muted">{demoBuyer.password}</p>
-          <p className="mt-1 text-muted">Test money only. No real account is charged.</p>
+          <p className="mt-1.5 font-mono text-muted select-all">{demoBuyer.email}</p>
+          <p className="font-mono text-muted select-all">{demoBuyer.password}</p>
+          <p className="mt-1.5 text-faint">Test money only. No real account is charged.</p>
         </div>
       )}
     </Card>

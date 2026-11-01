@@ -12,7 +12,7 @@ export function ProposalActions({ jobId, versionId, hash, versionNo }: { jobId: 
   return (
     <div className="mt-4">
       {error && (
-        <p role="alert" className="mb-3 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+        <p role="alert" className="mb-3 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
           {error}
         </p>
       )}

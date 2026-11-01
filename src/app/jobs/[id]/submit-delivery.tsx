@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { submitDeliveryAction } from "@/app/actions/delivery";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, fieldClass } from "@/components/ui";
 
 const DEMO_SITES = [
   { key: "good", label: "Good site" },
@@ -12,7 +12,7 @@ const DEMO_SITES = [
   { key: "hostile", label: "Hostile site" },
 ] as const;
 
-const field = "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+const field = fieldClass;
 
 export function SubmitDelivery({
   jobId,
@@ -43,19 +43,25 @@ export function SubmitDelivery({
   const [pending, startTransition] = useTransition();
 
   return (
-    <Card className="p-5">
-      <h2 className="font-semibold">
+    <Card className="border-brand/30 p-5 shadow-raised sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-xs font-medium text-brand">
+          <span className="size-2 rounded-full bg-brand" aria-hidden="true" />
+          Your delivery
+        </p>
+        <p className={`text-xs font-medium ${tryNo >= tries ? "text-held" : "text-muted"}`}>
+          Try {tryNo} of {tries}
+          {tryNo >= tries ? ": your last one. After it, the client decides whether you get another." : "."}
+        </p>
+      </div>
+      <h2 className="mt-1 text-lg font-semibold">
         {resubmission ? "Resubmit" : "Submit"} M{position}: {title}
       </h2>
-      <p className="mt-1 text-sm text-muted">Give the live link. Vouch checks it against this milestone&apos;s criteria and shows both of you the evidence.</p>
-      <p className="mt-1 text-sm text-muted">
-        Try {tryNo} of {tries}
-        {tryNo >= tries ? ": your last one. After it, the client decides whether you get another." : "."}
-      </p>
+      <p className="mt-1 text-sm text-pretty text-muted">Give the live link. Vouch checks it against this milestone&apos;s criteria and shows both of you the evidence.</p>
 
       {demo && (
         <div className="mt-4">
-          <p className="text-xs font-medium tracking-wide text-muted uppercase">Demo deliveries</p>
+          <p className="text-xs font-medium text-muted">Demo deliveries: pick one to fill in the link</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {DEMO_SITES.map((s) => (
               <Button key={s.key} type="button" variant="secondary" size="sm" onClick={() => setUrl(`${window.location.origin}/demo-sites/${s.key}/index.html`)}>
@@ -67,7 +73,7 @@ export function SubmitDelivery({
       )}
 
       <form
-        className="mt-4 space-y-3"
+        className="mt-5 space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
           setError(null);
@@ -91,11 +97,11 @@ export function SubmitDelivery({
           </>
         )}
         {error && (
-          <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+          <p role="alert" className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
             {error}
           </p>
         )}
-        <Button type="submit" disabled={pending || !url}>
+        <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={pending || !url}>
           {pending ? "Submitting…" : resubmission ? "Resubmit for checking" : "Submit for checking"}
         </Button>
       </form>

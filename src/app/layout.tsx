@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
-import { SandboxBanner, SiteHeader } from "@/components/site-header";
+import { SiteHeader } from "@/components/site-header";
 import { Container } from "@/components/ui";
 import "./globals.css";
 
@@ -12,22 +12,19 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f6f3" },
-    { media: "(prefers-color-scheme: dark)", color: "#0d0f12" },
-  ],
+  themeColor: "#fbfbfb",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        <SandboxBanner />
         <SiteHeader />
         <main className="flex-1">{children}</main>
-        <footer className="border-t border-line py-8 text-sm text-muted">
+        <footer className="mt-16 border-t border-line py-10 text-sm text-faint">
           <Container className="flex flex-col justify-between gap-2 sm:flex-row">
-            <span>Vouch · built for the PayPal AI Hackathon 2026</span>
+            <span>Vouch, built for the PayPal AI Hackathon 2026</span>
             <span>Runs on the PayPal sandbox. No real money moves.</span>
           </Container>
         </footer>

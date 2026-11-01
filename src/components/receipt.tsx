@@ -18,46 +18,46 @@ export function Receipt({ payments, milestones, completed, freelancer }: { payme
     if (p.type === "authorize") return "Held by PayPal (authorization)";
     if (p.type === "void") return "Unused hold released back to the client";
     const m = milestones.find((x) => x.id === p.milestoneId);
-    return `Released to ${freelancer}${m ? ` · M${m.position} ${m.title}` : ""}`;
+    return `Released to ${freelancer}${m ? `, M${m.position} ${m.title}` : ""}`;
   };
 
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold">{completed ? "Receipt" : "Payments so far"}</h2>
-        {completed && <Badge tone="brand">Completed</Badge>}
+        {completed && <Badge tone="ok">Completed</Badge>}
       </div>
-      <ul className="mt-3 divide-y divide-line border-t border-line text-sm">
+      <dl className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-surface-2 p-3 text-sm">
+        <div>
+          <dt className="text-xs text-muted">Held</dt>
+          <dd className="amount font-medium">{formatCents(held)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted">Released</dt>
+          <dd className="amount font-medium text-released">{formatCents(released)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted">Returned</dt>
+          <dd className="amount font-medium">{formatCents(returned)}</dd>
+        </div>
+      </dl>
+      <ul className="mt-2 divide-y divide-line text-sm">
         {rows.map((p) => (
-          <li key={p.id} className="flex items-start justify-between gap-3 py-2.5">
+          <li key={p.id} className="flex items-start justify-between gap-3 py-3">
             <div className="min-w-0">
-              <p>{label(p)}</p>
-              <p className="truncate font-mono text-xs text-muted" title={p.paypalId ?? undefined}>
-                {when(p.createdAt)} · PayPal {p.paypalId ?? "pending"}
+              <p className="text-pretty">{label(p)}</p>
+              <p className="mt-0.5 truncate text-xs text-faint" title={p.paypalId ?? undefined}>
+                {when(p.createdAt)} · PayPal <span className="font-mono">{p.paypalId ?? "pending"}</span>
                 {p.status === "pending" || p.status === "pending_paypal" ? " · pending" : ""}
               </p>
             </div>
-            <span className={`tabular shrink-0 font-mono ${p.type === "capture" ? "text-brand" : p.type === "void" ? "text-muted" : ""}`}>
+            <span className={`amount shrink-0 font-medium ${p.type === "capture" ? "text-released" : p.type === "void" ? "text-muted" : ""}`}>
               {p.type === "capture" ? "−" : ""}
               {formatCents(p.amountCents)}
             </span>
           </li>
         ))}
       </ul>
-      <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-sm">
-        <div>
-          <dt className="text-muted">Held</dt>
-          <dd className="tabular font-mono font-medium">{formatCents(held)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted">Released</dt>
-          <dd className="tabular font-mono font-medium text-brand">{formatCents(released)}</dd>
-        </div>
-        <div>
-          <dt className="text-muted">Returned</dt>
-          <dd className="tabular font-mono font-medium">{formatCents(returned)}</dd>
-        </div>
-      </dl>
     </Card>
   );
 }

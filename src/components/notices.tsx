@@ -13,17 +13,17 @@ export function Notices({ notices }: { notices: NoticeRow[] }) {
         <h2 className="font-semibold">For you</h2>
         {unread > 0 && <Badge tone="brand">{unread} new</Badge>}
       </div>
-      <ol className="mt-3 space-y-3">
+      <ol className="mt-4 space-y-4">
         {notices.map((n) => (
           <li key={n.id} className="flex gap-3 text-sm">
-            <span className={`mt-1.5 size-2 shrink-0 rounded-full ${n.readAt ? "bg-line" : "bg-brand"}`} aria-hidden="true" />
+            <span className={`mt-1.5 size-2 shrink-0 rounded-full ${n.readAt ? "bg-line-strong" : "bg-brand"}`} aria-hidden="true" />
             <div className="min-w-0">
-              <p className="font-medium text-pretty">
+              <p className={`text-pretty ${n.readAt ? "font-medium text-muted" : "font-semibold"}`}>
                 {!n.readAt && <span className="sr-only">New: </span>}
                 {n.title}
               </p>
               <p className="mt-0.5 text-pretty text-muted">{n.body}</p>
-              <time dateTime={n.createdAt.toISOString()} className="text-xs text-muted">
+              <time dateTime={n.createdAt.toISOString()} className="mt-1 block text-xs text-faint">
                 {ago(n.createdAt)}
               </time>
             </div>

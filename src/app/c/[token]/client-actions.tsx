@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { acceptBrief, previewProposal, proposeChanges, requestChanges } from "@/app/actions/agreement";
 import { VersionChanges } from "@/components/brief-view";
-import { Button, Card } from "@/components/ui";
+import { Button, Callout, Card, fieldClass } from "@/components/ui";
 import type { ProposalPreview } from "@/lib/jobs/agreement";
 import { formatCents } from "@/lib/money";
 
@@ -17,7 +17,7 @@ interface Props {
   freelancerName: string;
 }
 
-const field = "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+const field = fieldClass;
 
 export function ClientActions({ token, versionId, hash, totalCents, versionNo, freelancerName }: Props) {
   const router = useRouter();
@@ -50,19 +50,22 @@ export function ClientActions({ token, versionId, hash, totalCents, versionNo, f
   const busy = pending || drafting;
 
   return (
-    <Card className="p-5">
-      <p className="text-sm text-muted">Brief v{versionNo} · total</p>
-      <p className="tabular mt-1 font-mono text-3xl font-semibold">{formatCents(totalCents)}</p>
+    <Card className="border-brand/30 p-5 shadow-raised sm:p-6">
+      <p className="flex items-center gap-2 text-xs font-medium text-brand">
+        <span className="size-2 rounded-full bg-brand" aria-hidden="true" />
+        Your response to v{versionNo}
+      </p>
+      <p className="amount mt-2 text-4xl font-semibold">{formatCents(totalCents)}</p>
 
       {error && (
-        <p role="alert" className="mt-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+        <Callout tone="danger" role="alert" className="mt-4">
           {error}
-        </p>
+        </Callout>
       )}
 
       {mode === "idle" && (
         <>
-          <p className="mt-3 text-sm text-muted">
+          <p className="mt-2 text-sm text-pretty text-muted">
             Accepting doesn&apos;t charge you. Next you fund the job with PayPal: the money is held, not sent, and released milestone by milestone
             as deliveries pass these criteria.
           </p>
@@ -93,7 +96,7 @@ export function ClientActions({ token, versionId, hash, totalCents, versionNo, f
           />
           {drafting ? (
             <p className="text-sm text-muted" aria-live="polite">
-              <span className="mr-2 inline-block size-2 animate-pulse rounded-full bg-held" aria-hidden="true" />
+              <span className="mr-2 inline-block size-2 animate-pulse rounded-full bg-held-fill" aria-hidden="true" />
               Turning your request into concrete changes…
             </p>
           ) : (
@@ -118,16 +121,16 @@ export function ClientActions({ token, versionId, hash, totalCents, versionNo, f
           {preview.changes.length > 0 ? (
             <VersionChanges changes={preview.changes} fromVersion={versionNo} />
           ) : (
-            <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted">The AI couldn&apos;t turn this into changes. Try rewording it, or send it as a note.</p>
+            <p className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">The AI couldn&apos;t turn this into changes. Try rewording it, or send it as a note.</p>
           )}
           {preview.unclear && (
-            <p className="rounded-lg bg-held-soft px-3 py-2 text-sm text-held">
+            <p className="rounded-xl bg-held-soft px-4 py-3 text-sm text-held">
               <strong>Not included:</strong> {preview.unclear}
             </p>
           )}
           {preview.rejected.length > 0 && <p className="text-xs text-muted">{preview.rejected.length} suggested edit(s) didn&apos;t fit the brief&apos;s rules and were left out.</p>}
           <p className="text-sm text-muted">
-            New total <span className="tabular font-mono text-ink">{formatCents(preview.totalCents)}</span>. Vouch worked out this list from the actual
+            New total <span className="amount font-semibold text-ink">{formatCents(preview.totalCents)}</span>. Vouch worked out this list from the actual
             edits, so it&apos;s exactly what would change.
           </p>
           <div className="grid gap-2">

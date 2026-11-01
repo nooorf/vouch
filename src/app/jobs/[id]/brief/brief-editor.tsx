@@ -10,8 +10,9 @@ import { MAX_JOB_DAYS, type Brief, type Criterion, type Milestone } from "@/lib/
 import { formatCents } from "@/lib/money";
 
 const input =
-  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-ink placeholder:text-muted/70 focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
-const small = "rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+  "w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-ink shadow-soft placeholder:text-faint transition-[border-color,box-shadow] focus:border-brand focus:outline-none focus:ring-4 focus:ring-[var(--ring)]";
+const small =
+  "rounded-lg border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-ink transition-[border-color,box-shadow] focus:border-brand focus:outline-none focus:ring-4 focus:ring-[var(--ring)]";
 
 const uid = () => Math.random().toString(36).slice(2, 8);
 const GROUPS = { page: "Page", app: "Web app (checked in a real browser)", lighthouse: "Google Lighthouse", repo: "GitHub repo" } as const;
@@ -40,7 +41,7 @@ function MoneyInput({ cents, onChange, label }: { cents: number; onChange: (c: n
           const n = Math.round(parseFloat(e.target.value) * 100);
           if (Number.isFinite(n) && n >= 0) onChange(n);
         }}
-        className={`${small} tabular w-28 pl-6 font-mono`}
+        className={`${small} tabular w-28 pl-6`}
       />
     </div>
   );
@@ -59,7 +60,7 @@ function IntInput({ value, onChange, min, max, label, className = "w-16" }: { va
         const n = parseInt(e.target.value, 10);
         if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
       }}
-      className={`${small} tabular font-mono ${className}`}
+      className={`${small} tabular ${className}`}
     />
   );
 }
@@ -139,10 +140,10 @@ function CriterionRow({
   onRemove: () => void;
 }) {
   return (
-    <li className="rounded-lg border border-line bg-bg/40 p-3">
+    <li className="rounded-xl border border-line bg-bg p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="min-w-0 flex-1 space-y-2">
-          <Badge tone={c.kind === "check" ? "brand" : "info"}>{c.kind === "check" ? "Measured" : "AI-judged"}</Badge>
+          <Badge tone={c.kind === "check" ? "neutral" : "info"}>{c.kind === "check" ? "Measured" : "AI-judged"}</Badge>
           {c.kind === "check" ? (
             <>
               <select
@@ -207,7 +208,7 @@ function CriterionRow({
             Weight
             <IntInput value={c.weight} min={1} max={10} label="Weight" className="w-14" onChange={(weight) => onChange({ ...c, weight })} />
           </label>
-          <span className="tabular font-mono text-xs text-muted" title="This criterion's share of the milestone payment">
+          <span className="amount text-xs text-muted" title="This criterion's share of the milestone payment">
             ≈ {formatCents(valueCents)}
           </span>
           <label className="flex items-center gap-2 text-sm text-muted" title="If this fails, nothing is released for the milestone.">
@@ -251,9 +252,9 @@ function MilestoneCard({
     onChange({ ...m, criteria: [...m.criteria, { kind: "judged", id: `${m.id}-${uid()}`, rubric: "", weight: 2, required: false, visual: false }] });
 
   return (
-    <Card className="p-4 sm:p-5">
+    <Card className="p-5 sm:p-6">
       <div className="flex items-center gap-3">
-        <span className="tabular flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft font-mono text-sm font-semibold text-brand">
+        <span className="tabular flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold text-muted">
           M{index + 1}
         </span>
         <input aria-label="Milestone title" value={m.title} onChange={(e) => onChange({ ...m, title: e.target.value })} className={`${input} font-medium`} />
@@ -274,10 +275,10 @@ function MilestoneCard({
           <IntInput label="Due day" value={m.dueInDays} min={1} max={MAX_JOB_DAYS} onChange={(dueInDays) => onChange({ ...m, dueInDays })} />
         </label>
         <div className="flex min-w-48 flex-1 items-center gap-2" title="Share of this payment decided by measured checks rather than AI judgement">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-info-soft">
-            <div className="h-full bg-brand" style={{ width: `${share}%` }} />
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-released-fill" style={{ width: `${share}%` }} />
           </div>
-          <span className="tabular shrink-0 font-mono text-xs text-muted">{share}% measured</span>
+          <span className="tabular shrink-0 text-xs text-muted">{share}% measured</span>
         </div>
       </div>
 
@@ -389,9 +390,9 @@ export function BriefEditor({ jobId, initial, editable, versionNo }: { jobId: st
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10">
       <fieldset disabled={!editable} className="min-w-0 space-y-4">
-        <Card className="p-4 sm:p-5">
+        <Card className="p-5 sm:p-6">
           <label className="text-sm font-medium text-muted" htmlFor="title">
             Job title
           </label>
@@ -420,17 +421,17 @@ export function BriefEditor({ jobId, initial, editable, versionNo }: { jobId: st
         )}
       </fieldset>
 
-      <aside className="lg:sticky lg:top-6 lg:self-start">
-        <Card className="p-5">
+      <aside className="lg:sticky lg:top-24 lg:self-start">
+        <Card className="p-5 shadow-raised sm:p-6">
           <p className="text-sm text-muted">Total held from the client</p>
-          <p className="tabular mt-1 font-mono text-3xl font-semibold">{formatCents(totalCents)}</p>
+          <p className="amount mt-1 text-4xl font-semibold">{formatCents(totalCents)}</p>
           <ul className="mt-4 space-y-1.5 border-t border-line pt-4 text-sm">
             {brief.milestones.map((m, i) => (
               <li key={m.id} className="flex justify-between gap-3">
                 <span className="truncate text-muted">
                   M{i + 1} · day {m.dueInDays}
                 </span>
-                <span className="tabular font-mono">{formatCents(m.amountCents)}</span>
+                <span className="amount">{formatCents(m.amountCents)}</span>
               </li>
             ))}
           </ul>
@@ -468,10 +469,10 @@ export function BriefEditor({ jobId, initial, editable, versionNo }: { jobId: st
                 {warnings} suggestion{warnings > 1 ? "s" : ""} to make criteria checkable
               </p>
             ) : (
-              <p className="text-sm text-brand">Every criterion is checkable</p>
+              <p className="text-sm text-released">✓ Every criterion is checkable</p>
             )}
             {issues.length > 0 && (
-              <ul role="alert" className="mt-3 space-y-1 rounded-lg bg-danger-soft p-3 text-sm text-danger">
+              <ul role="alert" className="mt-3 space-y-1 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">
                 {issues.map((issue) => (
                   <li key={issue}>{issue}</li>
                 ))}

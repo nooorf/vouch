@@ -23,7 +23,7 @@ export function Countdown({ endsAt }: { endsAt: string }) {
   }, []);
   const left = end - now;
   return (
-    <span className="tabular font-mono font-medium" suppressHydrationWarning>
+    <span className="tabular font-semibold text-ink" suppressHydrationWarning>
       {left > 0 ? format(left) : "closing…"}
     </span>
   );
