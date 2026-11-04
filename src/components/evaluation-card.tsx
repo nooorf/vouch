@@ -1,5 +1,5 @@
 import type { schema } from "@/db";
-import { formatCents } from "@/lib/money";
+import { formatCents, splitByShares } from "@/lib/money";
 import type { Verdict } from "@/lib/policy/policy";
 import type { Measurements, RecordedResult } from "@/lib/referee/evaluate";
 import { AutoRefresh } from "./auto-refresh";
@@ -175,8 +175,8 @@ function ResultRow({ r, valueCents }: { r: RecordedResult; valueCents: number })
         {icon.s}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-          <p className="min-w-0 font-medium text-pretty">
+        <div className="flex items-start justify-between gap-x-4">
+          <p className="min-w-0 flex-1 font-medium text-pretty">
             {r.label}
             {r.required && <span className="ml-2 rounded-full bg-held-soft px-2 py-0.5 text-[11px] font-medium text-held">must pass</span>}
           </p>
@@ -289,7 +289,7 @@ export function EvaluationCard({
   }
 
   const results = ev.results ?? [];
-  const totalWeight = results.reduce((s, r) => s + r.weight, 0);
+  const rowCents = splitByShares(m.amountCents, results.map((r) => r.weight));
   const measurements = ev.measurements as unknown as Measurements | null;
   const report = measurements?.report;
   const ps = report?.pagespeed;
@@ -395,8 +395,8 @@ export function EvaluationCard({
             </p>
           </div>
           <ul className="mt-1 divide-y divide-line">
-            {results.map((r) => (
-              <ResultRow key={r.id} r={r} valueCents={totalWeight ? Math.floor((m.amountCents * r.weight) / totalWeight) : 0} />
+            {results.map((r, i) => (
+              <ResultRow key={r.id} r={r} valueCents={rowCents[i]} />
             ))}
           </ul>
         </>

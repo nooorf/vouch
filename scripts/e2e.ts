@@ -87,6 +87,8 @@ async function decide(page: Page, text: string) {
 async function shot(page: Page, name: string) {
   if (!SHOTS) return;
   if (!existsSync(SHOTS)) mkdirSync(SHOTS, { recursive: true });
+  // From the top, so the sticky header doesn't land mid-page in a full-page shot.
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 }
 
@@ -175,7 +177,8 @@ async function main() {
   console.log(`E2E against ${BASE}\n`);
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ["--no-first-run"] });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1366, height: 900 });
+  // Screenshots at retina scale, sharp enough for the README.
+  await page.setViewport({ width: 1366, height: 900, deviceScaleFactor: SHOTS ? 2 : 1 });
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // "Leave with unsaved changes?" prompts: the test leaves on purpose.
@@ -287,6 +290,7 @@ async function main() {
       await nav(() => clickByText(page, "a", "Client"));
       await text("What changed since v1");
       await text("Amount:");
+      await shot(page, "client-changes");
     });
 
     await step("Client asks AI to draft a change and proposes v3", async () => {

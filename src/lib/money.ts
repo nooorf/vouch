@@ -36,3 +36,21 @@ export function splitMoney(p: { totalCents: number; authorizedCents: number; rel
 export function returnedCents(job: { status: string; authorizedCents: number; capturedCents: number }): number {
   return job.status === "COMPLETED" || job.status === "CANCELLED" ? Math.max(0, job.authorizedCents - job.capturedCents) : 0;
 }
+
+/** Split total into integer cents by shares, largest remainder first, so parts add up exactly. */
+export function splitByShares(totalCents: number, shares: number[]): number[] {
+  const clean = shares.map((s) => (Number.isFinite(s) && s > 0 ? s : 0));
+  const sum = clean.reduce((a, b) => a + b, 0);
+  const weights = sum === 0 ? clean.map(() => 1) : clean;
+  const wsum = weights.reduce((a, b) => a + b, 0);
+  const exact = weights.map((w) => (totalCents * w) / wsum);
+  const parts = exact.map(Math.floor);
+  let left = totalCents - parts.reduce((a, b) => a + b, 0);
+  const order = exact.map((x, i) => ({ i, r: x - Math.floor(x) })).sort((a, b) => b.r - a.r || a.i - b.i);
+  for (const { i } of order) {
+    if (left <= 0) break;
+    parts[i] += 1;
+    left -= 1;
+  }
+  return parts;
+}

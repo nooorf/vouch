@@ -3,7 +3,7 @@ import { measuredShare } from "@/lib/brief/lint";
 import type { Brief } from "@/lib/brief/schema";
 import type { Change } from "@/lib/brief/diff";
 import { CLIENT_EXTRA_TRIES, DECISION_DAYS } from "@/lib/jobs/tries";
-import { formatCents } from "@/lib/money";
+import { formatCents, splitByShares } from "@/lib/money";
 import { Card } from "./ui";
 
 /** Read-only brief, as both sides see it once it's sent. */
@@ -18,7 +18,7 @@ export function BriefView({ brief, agreed }: { brief: Brief; /** Both sides acce
       </div>
       {brief.summary && <p className="max-w-[68ch] leading-relaxed text-pretty text-muted">{brief.summary}</p>}
       {brief.milestones.map((m, i) => {
-        const totalWeight = m.criteria.reduce((s, c) => s + c.weight, 0);
+        const rowCents = splitByShares(m.amountCents, m.criteria.map((c) => c.weight));
         return (
           <Card key={m.id} className="p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -33,7 +33,7 @@ export function BriefView({ brief, agreed }: { brief: Brief; /** Both sides acce
             </div>
             {m.description && <p className="mt-3 max-w-[68ch] text-sm text-pretty text-muted">{m.description}</p>}
             <ul className="mt-4 divide-y divide-line border-t border-line">
-              {m.criteria.map((c) => (
+              {m.criteria.map((c, ci) => (
                 <li key={c.id} className="flex items-start justify-between gap-4 py-3 text-sm">
                   <div className="min-w-0">
                     <p className="text-pretty">
@@ -46,7 +46,7 @@ export function BriefView({ brief, agreed }: { brief: Brief; /** Both sides acce
                     </p>
                   </div>
                   <span className="amount shrink-0 text-muted" title="This criterion's share of the milestone">
-                    {formatCents(totalWeight ? Math.floor((m.amountCents * c.weight) / totalWeight) : 0)}
+                    {formatCents(rowCents[ci])}
                   </span>
                 </li>
               ))}

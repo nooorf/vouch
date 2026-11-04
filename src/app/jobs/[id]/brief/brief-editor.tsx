@@ -7,7 +7,7 @@ import { Badge, Button, Card } from "@/components/ui";
 import { CHECKS, CHECK_IDS, DEFAULT_PARAMS, type CheckId, type ParamField } from "@/lib/brief/checks";
 import { lintBrief, measuredShare, type Lint } from "@/lib/brief/lint";
 import { MAX_JOB_DAYS, type Brief, type Criterion, type Milestone } from "@/lib/brief/schema";
-import { formatCents } from "@/lib/money";
+import { formatCents, splitByShares } from "@/lib/money";
 
 const input =
   "w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-ink shadow-soft placeholder:text-faint transition-[border-color,box-shadow] focus:border-brand focus:outline-none focus:ring-4 focus:ring-[var(--ring)]";
@@ -244,7 +244,7 @@ function MilestoneCard({
   onRemove: () => void;
 }) {
   const share = Math.round(measuredShare(m) * 100);
-  const totalWeight = m.criteria.reduce((s, c) => s + c.weight, 0);
+  const rowCents = splitByShares(m.amountCents, m.criteria.map((c) => c.weight));
   const setCriterion = (i: number, c: Criterion) => onChange({ ...m, criteria: m.criteria.map((x, j) => (j === i ? c : x)) });
   const addCheck = () =>
     onChange({ ...m, criteria: [...m.criteria, { kind: "check", id: `${m.id}-${uid()}`, checkId: "has_h1", params: {}, weight: 2, required: false }] });
@@ -298,7 +298,7 @@ function MilestoneCard({
             key={c.id}
             c={c}
             lints={lints.filter((l) => l.criterionId === c.id)}
-            valueCents={totalWeight ? Math.floor((m.amountCents * c.weight) / totalWeight) : 0}
+            valueCents={rowCents[i]}
             onChange={(next) => setCriterion(i, next)}
             onRemove={() => onChange({ ...m, criteria: m.criteria.filter((_, j) => j !== i) })}
           />

@@ -67,15 +67,21 @@ To run it yourself, see [Run it locally](#run-it-locally).
 
 <table>
 <tr>
-<td width="62%" valign="top"><img src="docs/screenshots/evaluation.png" alt="Evaluation card: M1 passed, $210 released in 1:53 unless the client approves sooner or disputes. Each measured check shows its evidence and its share of the payment; the AI-judged criterion quotes what it saw in the screenshot." width="100%"></td>
-<td width="38%" valign="top"><img src="docs/screenshots/client-funded.png" alt="The client's view: notices (brief agreed, fund the job) and the money bar showing $450 held by PayPal, $0 released." width="100%"></td>
+<td colspan="2"><img src="docs/screenshots/next-step.png" alt="The client's job page: progress from brief drafted to completed, a highlighted 'Your next step' strip reading 'Decide on M2' with 1:46 left and a Go to decision button, the two milestones ($210 of $210 released, $0 of $240 held), and the money card showing $210 released and $240 held in PayPal." width="100%"></td>
 </tr>
 <tr>
-<td valign="top"><sub><b>Every verdict shows its evidence.</b> Each check states what it measured and what share of the payment rides on it. The AI's answer quotes what it saw. Both sides see the same card and the countdown to release.</sub></td>
-<td valign="top"><sub><b>The client sees what's held and what's next.</b> Money held by PayPal, not yet released, and notices for anything that needs them.</sub></td>
+<td colspan="2"><sub><b>The next step is always in view.</b> Both sides see where the job stands, the one thing that happens next, who it's waiting on and the deadline, with the money held by PayPal right beside it.</sub></td>
 </tr>
 <tr>
-<td colspan="2"><img src="docs/screenshots/brief-changes.png" alt="What changed since v2: the exact edits the client's request produced, computed by code from the real changes." width="100%"></td>
+<td width="62%" valign="top"><img src="docs/screenshots/evaluation.png" alt="Evaluation card for M1: passed, $210 released in full. Five criteria, each with its evidence and its share of the payment: loads over HTTPS (must pass), main heading, at least 4 content sections, mentions the agreed phrases (must pass), and an AI-judged question answered from the screenshot. Footer: loaded in a real browser at phone and desktop size." width="100%"></td>
+<td width="38%" valign="top"><img src="docs/screenshots/money.png" alt="The money card after the job ended: $450 total, $210 released to the freelancer, $240 returned to the client. Below, every payment with its PayPal id: the $450 authorization, the $210 capture for M1, and the unused $240 hold released back to the client." width="100%"></td>
+</tr>
+<tr>
+<td valign="top"><sub><b>Every verdict shows its evidence.</b> Each check states what it measured and what share of the payment rides on it. The AI's answer says what it saw, and the page was loaded in a real browser, the way a visitor sees it. Both sides see the same card.</sub></td>
+<td valign="top"><sub><b>Where every dollar went.</b> The authorization, each capture and the returned hold, with PayPal's ids.</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/brief-review.png" alt="The client reviewing v2 of the brief: a 'Your next step' strip, 'What changed since v1' listing Total $400 to $450 and M1 amount $160 to $210, and a panel with Accept this brief and Request changes." width="100%"></td>
 </tr>
 <tr>
 <td colspan="2"><sub><b>Negotiation without surprises.</b> When the client asks for a change in plain words, the AI proposes edits, and code computes this list from the real edits, including anything the client didn't ask for, before anyone accepts.</sub></td>
@@ -95,6 +101,10 @@ To run it yourself, see [Run it locally](#run-it-locally).
 | A delivery tries to manipulate the AI | Instructions aimed at an AI grader, including hidden text and code comments, are detected in code and send the delivery to a person. |
 | The freelancer disappears | Before a deadline, a job ends only by agreement. After a missed deadline and a 24-hour grace period, the client can cancel and the unused hold is voided. |
 | The job runs long | PayPal holds a payment for 29 days. Vouch reauthorizes after day 3, gives notice around day 25, and settles everything by the agreed rules a day before the hold ends. |
+
+<img src="docs/screenshots/decision.png" alt="'What should happen with M2?' The client picks one of four options: give the freelancer another try (suggested), accept as is and release $240, skip this milestone ($240 back), or end the project ($240 back). Nothing happens until they press Confirm decision." width="62%">
+
+<sub><b>Money decisions are pick, then confirm.</b> When the freelancer is out of tries, only the client can move the job on, and each option says exactly where the money goes.</sub>
 
 ## Can you trust the referee?
 
