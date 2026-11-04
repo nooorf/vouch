@@ -131,6 +131,9 @@ const sameSite = (a: string, b: string) => {
  * scroll it, so we compare the document's scroll width with the layout width rather than
  * scrolling; window.innerWidth also grows for clipped content, so it isn't used.)
  */
+/** Tallest screenshot sent to the AI judge, in CSS pixels (about seven phone screens). */
+const SHOT_MAX_HEIGHT = 6000;
+
 async function measure(page: PuppeteerPage, width: number): Promise<ViewportResult> {
   const m = await page.evaluate(() => {
     const doc = document.documentElement;
@@ -154,7 +157,18 @@ async function measure(page: PuppeteerPage, width: number): Promise<ViewportResu
     }
     return { layoutWidth, sidewaysScroll, offenders };
   });
-  const shot = await page.screenshot({ type: "jpeg", quality: 60, encoding: "base64" }).catch(() => null);
+  // The whole page, top to bottom, so the AI judge can answer about anything a visitor scrolls to
+  // (a contact form, a footer), not only the first screen. Very long pages are cut at SHOT_MAX_HEIGHT.
+  const height = await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0)).catch(() => 0);
+  const shot = await page
+    .screenshot({
+      type: "jpeg",
+      quality: 60,
+      encoding: "base64",
+      captureBeyondViewport: true,
+      ...(height > 0 ? { clip: { x: 0, y: 0, width, height: Math.min(height, SHOT_MAX_HEIGHT) } } : {}),
+    })
+    .catch(() => null);
   return {
     width,
     ...m,
