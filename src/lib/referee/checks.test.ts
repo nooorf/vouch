@@ -51,9 +51,9 @@ describe("measured checks on the demo sites", () => {
     expect(Object.values(await statuses("good"))).toEqual(PAGE_CHECKS.map(() => "pass"));
   });
 
-  it("the flawed site fails exactly the viewport and alt-text checks", async () => {
+  it("the flawed site is partly right: of the page checks, only alt text fails", async () => {
     const s = await statuses("flawed");
-    expect(Object.entries(s).filter(([, v]) => v !== "pass").map(([k]) => k)).toEqual(["viewport_meta", "img_alt_ratio"]);
+    expect(Object.entries(s).filter(([, v]) => v !== "pass").map(([k]) => k)).toEqual(["img_alt_ratio"]);
   });
 
   it("the fixed site passes again", async () => {
@@ -67,7 +67,8 @@ describe("measured checks on the demo sites", () => {
   it("gives evidence a person can check", async () => {
     const ctx = ctxFor("flawed");
     expect((await runCheck("img_alt_ratio", { minRatio: 0.9 }, ctx)).evidence).toMatch(/^0 of 5 images have alt text \(0%, needs 90%\)/);
-    expect((await runCheck("viewport_meta", {}, ctx)).evidence).toMatch(/No viewport meta tag/);
+    const noViewport = parsePage({ url: ORIGIN, finalUrl: ORIGIN, status: 200, ms: 1, bytes: 1, truncated: false, html: "<html><head></head><body><p>x</p></body></html>" });
+    expect((await runCheck("viewport_meta", {}, { ...ctx, page: noViewport })).evidence).toMatch(/No viewport meta tag/);
     expect((await runCheck("min_sections", { min: 4 }, ctxFor("good"))).evidence).toBe("5 content sections found (needs 4).");
     expect((await runCheck("has_form", { fields: ["name", "email", "message"] }, ctx)).evidence).toBe("A form with “name”, “email”, “message”.");
     expect((await runCheck("responsive_css", {}, ctx)).evidence).toMatch(/media queries in site\.css/);

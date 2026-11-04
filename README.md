@@ -51,7 +51,7 @@
 Open **[the live demo](DEMO_URL)** and click **Try the demo**. No sign-up: you get a private workspace on the PayPal sandbox and play both sides, switching between the freelancer's and the client's view in one click.
 
 - **Paying:** the client page shows a sandbox buyer login. No real money moves.
-- **Delivering:** one-click demo deliveries: a good site, a flawed one, its fixed version, and a hostile page that tries to talk the AI into paying.
+- **Delivering:** one-click demo deliveries: a good site, a flawed one that is only partly right (it works on phones but fails accessibility), its fixed version, and a hostile page that tries to talk the AI into paying. When a milestone checks the code, the demo repository is filled in too.
 - **Watching time pass:** demo jobs use a 2-minute review window, and a "skip to the deadline" button shows what happens when a freelancer misses one.
 
 To run it yourself, see [Run it locally](#run-it-locally).

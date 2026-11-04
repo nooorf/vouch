@@ -7,7 +7,7 @@ import { formatCents } from "@/lib/money";
 /** Example states for the hero preview, built from the real demo brief. */
 const preview = [
   { status: "Released", tone: "ok" as const, released: 15000, note: "All 5 checks passed" },
-  { status: "Partial", tone: "held" as const, released: 9000, note: "2 fixes: viewport tag, image alt text" },
+  { status: "Partial", tone: "held" as const, released: 9000, note: "2 fixes: image alt text, accessibility score" },
   { status: "Held", tone: "neutral" as const, released: 0, note: "Waiting for delivery" },
 ];
 
