@@ -26,6 +26,7 @@ import { holdPhase } from "@/lib/jobs/hold-rules";
 import { canWithdraw, triesAllowed, triesLeft } from "@/lib/jobs/tries";
 import { milestonesWithEvaluations } from "@/lib/jobs/views";
 import { formatCents, returnedCents } from "@/lib/money";
+import { env } from "@/lib/env";
 import { listNotices, markNoticesRead } from "@/lib/notify";
 import { requireUser } from "@/lib/session";
 import { FreelancerCancelPanel } from "./cancel-panel";
@@ -234,6 +235,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
                 title={current.title}
                 wantsRepo={current.criteria.some((c) => (c.kind === "check" && ["repo_readme", "repo_fresh_commits", "ci_passing"].includes(c.checkId)) || (c.kind === "judged" && c.source === "code"))}
                 demo={user.demo}
+                demoRepo={user.demo ? env().DEMO_REPO_URL : undefined}
                 resubmission={current.attempts > 0}
                 tryNo={current.attempts + 1}
                 tries={triesAllowed(job.maxResubmissions, current)}

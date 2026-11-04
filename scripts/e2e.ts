@@ -405,8 +405,7 @@ async function main() {
       if (m1Partial) {
         await step("Freelancer resubmits M1 and the client approves the rest", async () => {
           await nav(() => clickByText(page, "a", "Freelancer"));
-          await clickByText(page, "button", "Good site");
-          if (await page.$("#delivery-repo")) await page.type("#delivery-repo", "https://github.com/sindresorhus/is");
+          await clickByText(page, "button", "Good site"); // also fills the demo repo when the brief checks code
           await clickByText(page, "button", "Resubmit for checking");
           await page.waitForFunction(() => /try 2 of/.test(document.body.innerText) && !document.body.innerText.includes("Checking the delivery"), { timeout: 180_000 });
           await nav(() => clickByText(page, "a", "Client"));

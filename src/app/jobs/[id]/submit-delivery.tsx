@@ -21,6 +21,7 @@ export function SubmitDelivery({
   title,
   wantsRepo,
   demo,
+  demoRepo,
   resubmission,
   tryNo,
   tries,
@@ -31,6 +32,8 @@ export function SubmitDelivery({
   title: string;
   wantsRepo: boolean;
   demo: boolean;
+  /** Filled in with a demo site when the brief checks the code. */
+  demoRepo?: string;
   resubmission: boolean;
   /** Which try this delivery will be, and how many this milestone allows right now. */
   tryNo: number;
@@ -61,10 +64,21 @@ export function SubmitDelivery({
 
       {demo && (
         <div className="mt-4">
-          <p className="text-xs font-medium text-muted">Demo deliveries: pick one to fill in the link</p>
+          <p className="text-xs font-medium text-muted">
+            Demo deliveries: pick one to fill in the link{wantsRepo && demoRepo ? " and the demo repository" : ""}
+          </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {DEMO_SITES.map((s) => (
-              <Button key={s.key} type="button" variant="secondary" size="sm" onClick={() => setUrl(`${window.location.origin}/demo-sites/${s.key}/index.html`)}>
+              <Button
+                key={s.key}
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setUrl(`${window.location.origin}/demo-sites/${s.key}/index.html`);
+                  if (wantsRepo && demoRepo) setRepo(demoRepo);
+                }}
+              >
                 {s.label}
               </Button>
             ))}

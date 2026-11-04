@@ -55,6 +55,8 @@ const EnvSchema = z
     CHROME_PATH: opt(z.string().min(1)),
     /** Review window for demo jobs, so judges can watch the silence rule release money. */
     DEMO_REVIEW_WINDOW_SECONDS: z.preprocess((v) => (v === "" || v === undefined ? undefined : Number(v)), z.number().int().min(10).max(86_400).default(120)),
+    /** Public repo the one-click demo deliveries attach when a brief checks the code. The demo sites' source lives in it. */
+    DEMO_REPO_URL: z.preprocess((v) => (v === "" ? undefined : v), z.url().default("https://github.com/nooorf/vouch")),
     /** Local development only: let the referee fetch http://localhost (e.g. the demo sites). */
     REFEREE_ALLOW_LOCALHOST: flag,
   })
