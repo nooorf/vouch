@@ -12,7 +12,7 @@
 ![Vercel](https://img.shields.io/badge/Deploys%20on-Vercel-0d7a64?style=for-the-badge&labelColor=15181d&logo=vercel&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-5d6370?style=for-the-badge&labelColor=15181d)
 
-**[▶ 3-minute demo](https://www.youtube.com/watch?v=mfoyhSgsxrM) · [Try it live](https://vouch-nine-omega.vercel.app) · [How it works](#how-it-works) · [Results](#can-you-trust-the-referee) · [Where the money goes](#where-the-money-goes) · [Architecture](#architecture)**
+**[▶ 3-minute demo](https://www.youtube.com/watch?v=mfoyhSgsxrM) · [Try it live](https://vouch-nine-omega.vercel.app) · [How it works](#how-it-works) · [Results](#can-you-trust-the-referee) · [Where the money goes](#where-the-money-goes) · [How it uses AI](#how-vouch-uses-ai) · [Architecture](#architecture)**
 
 </div>
 
@@ -107,7 +107,7 @@ To run it yourself, see [Run it locally](#run-it-locally).
 
 ## Can you trust the referee?
 
-A referee that decides when money moves is only as good as its record on work it has never seen. We ran it, exactly as production runs it, on public websites and open-source repositories with realistic briefs, labelled by a person **before** the referee saw them.
+A referee that decides when money moves is only as good as its record on work it has never seen. I ran it, exactly as production runs it, on public websites and open-source repositories with realistic briefs, labelled by a person **before** the referee saw them.
 
 | Benchmark | Deliveries | Verdicts right | Criteria right | Money released that shouldn't have been |
 |---|---:|---:|---:|---:|
@@ -115,7 +115,7 @@ A referee that decides when money moves is only as good as its record on work it
 | **Held-out repositories** (code questions) | 7 | **7/7** | **32/32** | **0** |
 | Development set | 12 | 12/12 | 59/59 | 0 |
 
-The held-out sets include client-rendered React and Svelte apps, uncustomized templates, wrong deliveries, broken pages, dead links, an 8-second page, a 1996 site submitted as "mobile-friendly", and two shops that look real but say on the page that nothing is for sale. The first held-out run scored 16/18 with one wrong release; the fixes were general rules, never site-specific, and twice the referee turned out to be right where our own labels were wrong. The last column matters most: a referee that wrongly withholds can be corrected by the client, one that wrongly releases can't.
+The held-out sets include client-rendered React and Svelte apps, uncustomized templates, wrong deliveries, broken pages, dead links, an 8-second page, a 1996 site submitted as "mobile-friendly", and two shops that look real but say on the page that nothing is for sale. The first held-out run scored 16/18 with one wrong release; the fixes were general rules, never site-specific, and twice the referee turned out to be right where my own labels were wrong. The last column matters most: a referee that wrongly withholds can be corrected by the client, one that wrongly releases can't.
 
 Full method, misses and known limits: **[referee evaluation report](docs/referee-evaluation.md)**.
 
@@ -127,14 +127,14 @@ Every dollar moves through PayPal's APIs, server-side, with amounts read from th
 |---|---|
 | **Orders v2**: create with `intent: AUTHORIZE`, authorize, get | One order per job holds the agreed total. After authorizing, the held amount must equal the agreed total to the cent, or the hold is voided at once. A checkout interrupted after approval is finished on the next page load. |
 | **Payments v2**: capture (`final_capture: false`) | Many partial captures against one authorization, one per milestone release. Each is reserved in the database before PayPal is called, with a deterministic `PayPal-Request-Id`, so a retry or two simultaneous clicks can never pay twice. |
-| **Payments v2**: reauthorize | Once, after the 3-day honor period, so later captures stay guaranteed. (Sandbox testing showed PayPal allows exactly one reauthorization; we designed around that.) |
+| **Payments v2**: reauthorize | Once, after the 3-day honor period, so later captures stay guaranteed. (Sandbox testing showed PayPal allows exactly one reauthorization; Vouch is designed around that.) |
 | **Payments v2**: void | Returns the unused hold when a job completes, is cancelled, or runs into the 29-day limit. |
 | **Webhooks**: `verify-webhook-signature` | Approved checkouts, authorizations, captures (completed or denied), voids and refunds. Each event is verified with PayPal, recorded once, and reconciled with the same idempotent code the pages use. |
 | **JavaScript SDK** buttons | The client's checkout, with the order created and authorized on the server. |
 
 ### Where the money goes
 
-**In this build, Vouch's own PayPal merchant account receives the captures, and each freelancer's earnings are tracked in the ledger.** The ideal is that PayPal pays the freelancer directly and the platform never holds funds. We tested that first, and it's the production path.
+**In this build, Vouch's own PayPal merchant account receives the captures, and each freelancer's earnings are tracked in the ledger.** The ideal is that PayPal pays the freelancer directly and the platform never holds funds. I tested that first, and it's the production path.
 
 | | Freelancer as payee (tested in sandbox) | Platform as payee (this build) |
 |---|---|---|
@@ -147,14 +147,28 @@ Paying the freelancer directly works for every capture, but returning unused mon
 
 **In production:** freelancers onboard as merchants through **PayPal Multiparty** (Partner Referrals), and Vouch captures and voids on their behalf with an auth assertion. Money goes straight from the client's hold to the freelancer, and Vouch never holds it. Nothing else changes: the referee, the policy engine and the ledger are independent of who the payee is. You can reproduce the direct-capture test with `npm run smoke -- --payee`.
 
+## How Vouch uses AI
+
+AI does the reading and writing that rules can't; plain code makes every money decision.
+
+| Where | What the AI does | What keeps it honest |
+|---|---|---|
+| **Drafting the brief** | Turns the freelancer's plain-words description into milestones, amounts and checkable criteria, picking measured checks wherever a rule can decide. | A schema rejects invalid briefs and code flags vague criteria; both sides must accept the exact version, fingerprinted by a hash. |
+| **Negotiating changes** | Turns the client's plain-words request ("move $50 to the first milestone") into exact edit operations. | Code applies the edits, rejects any that break the rules, and computes the "what changed" list from the real edits. |
+| **Judging a website** | Answers the brief's subjective questions ("does the copy read as written for a coffee roastery?") from the page's visible text, plus a screenshot for visual criteria. | Every "yes" must quote the page, and code checks the quote exists. Hidden text is stripped first; injection attempts send the delivery to a person. |
+| **Judging code** | Answers code questions ("is there a test for the checkout flow?") from the repository at a pinned commit. | Every answer must cite file and lines, verified in code. |
+| **Re-checking a dispute** | Looks again at the criteria the client disputes, with their objection as a claim to check, not an instruction. | Nothing is released during the re-check; the client decides afterwards. |
+
+**Models:** Google Gemini first, with Groq (open-weight models) as the fallback when Gemini is out of quota or busy, both on free tiers. Every answer is validated against a schema; low confidence or a failed check means NEEDS_HUMAN, never a guess. The AI never calls PayPal and never decides how much is released: the policy engine does, from the check results. How well it judges is measured in **[Can you trust the referee?](#can-you-trust-the-referee)**
+
 ## Built with APIMatic
 
-The PayPal integration was written with **APIMatic's context plugin for the PayPal Server SDK** (`@paypal/paypal-server-sdk`, pinned at 2.5.0), used as agent skills while coding. It caught problems that the SDK's types don't show:
+I built the PayPal integration using **APIMatic's context plugin for the PayPal Server SDK** (`@paypal/paypal-server-sdk`, pinned at 2.5.0), which supplies SDK-specific API context while coding. It surfaced problems that the SDK's types don't show:
 
-- **No timeout by default.** The generated client waits forever (`timeout: 0`). We set 15 seconds.
-- **No retries by default.** Retries are off until both `maxNumberOfRetries` and `maximumRetryWaitTime` are set. We enabled them, which is safe because every write carries a request id.
-- **Logging leaks.** Supplying any logging config prints every request and response, so we removed it and log failures ourselves.
-- **Error bodies.** A bare `ApiError` leaves `result` undefined; the details are in `body` with PayPal's own field names (`details[0].issue`, `debug_id`). Our error helper reads them, which is how sandbox testing surfaced `REAUTHORIZATION_TOO_SOON` and shaped the money model.
+- **No timeout by default.** The generated client waits forever (`timeout: 0`). Vouch sets 15 seconds.
+- **No retries by default.** Retries are off until both `maxNumberOfRetries` and `maximumRetryWaitTime` are set. Vouch enables them, which is safe because every write carries a request id.
+- **Logging leaks.** Supplying any logging config prints every request and response, so Vouch leaves it out and logs failures itself.
+- **Error bodies.** A bare `ApiError` leaves `result` undefined; the details are in `body` with PayPal's own field names (`details[0].issue`, `debug_id`). Vouch's error helper reads them, which is how sandbox testing surfaced `REAUTHORIZATION_TOO_SOON` and shaped the money model.
 - **What the SDK doesn't cover.** There is no webhook operation, so signature verification calls PayPal's REST endpoint with a token from the SDK's own auth manager.
 
 ## Architecture
