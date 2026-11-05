@@ -48,6 +48,8 @@ next-env.d.ts
 /internal/
 /Vouch AI Escrow for Freelance Work - Setup, Plan and Demo.md
 /.claude/
+/.agents/
+/skills-lock.json
 /AGENTS.md
 
 # Eval run outputs
