@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="t d">
   <title id="t">Vouch architecture</title>
-  <desc id="d">Freelancer, client and a scheduler talk to one Next.js app on Render. Inside: brief and agreement, funding and release, the referee, the AI judge, the policy engine, time-based rules, the tick and task queue, and the webhook receiver, all writing to an append-only ledger. Outside: PayPal Orders, Payments and Webhooks; Gemini and Groq; Kernel cloud browsers; Google PageSpeed; GitHub; and Neon Postgres.</desc>
+  <desc id="d">Freelancer, client and a scheduler talk to one Next.js app on Vercel. Inside: brief and agreement, funding and release, the referee, the AI judge, the policy engine, time-based rules, the tick and task queue, and the webhook receiver, all writing to an append-only ledger. Outside: PayPal Orders, Payments and Webhooks; Gemini and Groq; Kernel cloud browsers; Google PageSpeed; GitHub; and Neon Postgres.</desc>
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#9aa1ad"/>
@@ -46,7 +46,7 @@
 
   <!-- App -->
   <rect x="288" y="52" width="624" height="672" rx="16" fill="#15181d" stroke="#35c29f" stroke-opacity="0.35"/>
-  <text x="312" y="84" class="h" style="font-size:17px">Vouch · one Next.js 16 app on Render</text>
+  <text x="312" y="84" class="h" style="font-size:17px">Vouch · one Next.js 16 app on Vercel</text>
   <text x="312" y="106" class="b">Server actions and route handlers; money and rules run only on the server.</text>
 
   <rect x="312" y="124" width="282" height="104" rx="10" class="box"/>

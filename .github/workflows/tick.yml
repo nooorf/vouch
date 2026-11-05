@@ -1,8 +1,8 @@
 name: Tick
 
 # Backup scheduler for the deployed app: settles review windows and finishes funding for jobs
-# nobody is viewing. Free for public repos. It also keeps a free Render instance from sleeping.
-# Needs two repository secrets: APP_URL (e.g. https://vouch.onrender.com) and CRON_SECRET.
+# nobody is viewing. Free for public repos. (Vercel's own cron runs only once a day on the free plan.)
+# Needs two repository secrets: APP_URL (e.g. https://vouch-nine-omega.vercel.app) and CRON_SECRET.
 on:
   schedule:
     - cron: "*/10 * * * *" # GitHub may run scheduled jobs a few minutes late

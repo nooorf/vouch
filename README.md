@@ -1,4 +1,4 @@
-<!-- Before submitting: replace DEMO_URL and VIDEO_URL below with the Render URL and the YouTube link. -->
+<!-- Before submitting: replace VIDEO_URL below with the YouTube link. -->
 <div align="center">
 
 <img src="docs/assets/hero.svg" alt="Vouch: pay on proof. Freelance payments on PayPal. An AI referee checks every delivery against the agreed brief; a milestone that partly meets it releases $90 and holds $60 until a fix." width="100%">
@@ -10,10 +10,10 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-0d7a64?style=for-the-badge&labelColor=15181d&logo=nextdotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-2457c5?style=for-the-badge&labelColor=15181d&logo=typescript&logoColor=white)<br>
 ![APIMatic](https://img.shields.io/badge/Built%20with-APIMatic-c27c14?style=for-the-badge&labelColor=15181d)
-![Render](https://img.shields.io/badge/Deploys%20on-Render-0d7a64?style=for-the-badge&labelColor=15181d&logo=render&logoColor=white)
+![Vercel](https://img.shields.io/badge/Deploys%20on-Vercel-0d7a64?style=for-the-badge&labelColor=15181d&logo=vercel&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-5d6370?style=for-the-badge&labelColor=15181d)
 
-**[▶ 3-minute demo](VIDEO_URL) · [Try it live](DEMO_URL) · [How it works](#how-it-works) · [Results](#can-you-trust-the-referee) · [Where the money goes](#where-the-money-goes) · [Architecture](#architecture)**
+**[▶ 3-minute demo](VIDEO_URL) · [Try it live](https://vouch-nine-omega.vercel.app) · [How it works](#how-it-works) · [Results](#can-you-trust-the-referee) · [Where the money goes](#where-the-money-goes) · [Architecture](#architecture)**
 
 </div>
 
@@ -48,7 +48,7 @@
 
 ## Try it
 
-Open **[the live demo](DEMO_URL)** and click **Try the demo**. No sign-up: you get a private workspace on the PayPal sandbox and play both sides, switching between the freelancer's and the client's view in one click.
+Open **[the live demo](https://vouch-nine-omega.vercel.app)** and click **Try the demo**. No sign-up: you get a private workspace on the PayPal sandbox and play both sides, switching between the freelancer's and the client's view in one click.
 
 - **Paying:** the client page shows a sandbox buyer login. No real money moves.
 - **Delivering:** one-click demo deliveries: a good site, a flawed one that is only partly right (it works on phones but fails accessibility), its fixed version, and a hostile page that tries to talk the AI into paying. When a milestone checks the code, the demo repository is filled in too.
@@ -160,7 +160,7 @@ The PayPal integration was written with **APIMatic's context plugin for the PayP
 
 ## Architecture
 
-<img src="docs/assets/architecture.svg" alt="Freelancer, client and a scheduler talk to one Next.js app on Render. Inside: brief and agreement, funding and release, the referee, the AI judge, the policy engine, time-based rules, the tick and task queue, and the webhook receiver, all writing to an append-only ledger. Outside: PayPal Orders, Payments and Webhooks; Gemini and Groq; Kernel cloud browsers; Google PageSpeed; GitHub; Neon Postgres." width="100%">
+<img src="docs/assets/architecture.svg" alt="Freelancer, client and a scheduler talk to one Next.js app on Vercel. Inside: brief and agreement, funding and release, the referee, the AI judge, the policy engine, time-based rules, the tick and task queue, and the webhook receiver, all writing to an append-only ledger. Outside: PayPal Orders, Payments and Webhooks; Gemini and Groq; Kernel cloud browsers; Google PageSpeed; GitHub; Neon Postgres." width="100%">
 
 ## Engineering highlights
 
@@ -234,11 +234,11 @@ npm run smoke                   # PayPal sandbox smoke test
 ```
 
 <details>
-<summary><b>Deploying on Render</b></summary>
+<summary><b>Deploying on Vercel</b></summary>
 <br>
 
-1. Create a **Web Service** from this repository: build `npm ci && npm run build`, start `npm start`, and set `NODE_VERSION=24`.
-2. Add the variables from `.env.local`, with `APP_URL` set to the Render URL. Web-app rendering in production needs `KERNEL_API_KEY`.
+1. Import this repository as a new Vercel project. Vercel detects Next.js, so the default build settings work; set the Node.js version to 24 in the project settings.
+2. Add the variables from `.env.local`, with `APP_URL` set to the Vercel URL. Web-app rendering in production needs `KERNEL_API_KEY`.
 3. In the PayPal developer dashboard, add a webhook for `https://<app>/api/paypal/webhook` with the six events listed in `src/lib/paypal/webhook-event.ts`, and set `PAYPAL_WEBHOOK_ID`.
 4. Add `APP_URL` and `CRON_SECRET` as GitHub repository secrets. The **Tick** workflow then brings idle jobs up to date every 10 minutes.
 
@@ -274,7 +274,7 @@ drizzle/            database migrations
 
 ## Tech stack
 
-Next.js 16 (App Router, server actions) · React 19 · TypeScript · Tailwind CSS 4 · PayPal Server SDK · PayPal JS SDK · Drizzle ORM · Neon Postgres · Zod · Google Gemini · Groq · Kernel · Puppeteer · Google PageSpeed Insights · Cheerio · Vitest · GitHub Actions · Render
+Next.js 16 (App Router, server actions) · React 19 · TypeScript · Tailwind CSS 4 · PayPal Server SDK · PayPal JS SDK · Drizzle ORM · Neon Postgres · Zod · Google Gemini · Groq · Kernel · Puppeteer · Google PageSpeed Insights · Cheerio · Vitest · GitHub Actions · Vercel
 
 ## License
 

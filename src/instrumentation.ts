@@ -19,7 +19,7 @@ export async function register() {
   console.log(`[vouch] features\n  ${featureReport().join("\n  ")}`);
 }
 
-/** One structured line per server error, easy to search in Render's logs. */
+/** One structured line per server error, easy to search in Vercel's logs. */
 export const onRequestError: Instrumentation.onRequestError = async (err, request, context) => {
   const e = err as Error & { digest?: string };
   console.error(
