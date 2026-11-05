@@ -170,11 +170,5 @@ No development misses on this run.
 
 ## Known limits
 
-- **One page per delivery.** The referee judges the delivered URL, not the whole site; criteria about other pages need their own link.
-- **No clicking through flows.** It loads pages; it doesn't log in, submit forms or complete a checkout.
-- **What "visible" means.** Text a browser draws counts as visible even if it's the same colour as the background; content behind JavaScript accordions or tabs isn't read (native <details> sections are opened).
-- **Loading has a limit.** A page gets 20 s to load and 10 s more for its data; slower apps are judged on what they show by then.
-- **Code is read, not run.** Code questions are answered by reading the repository's default branch at its latest commit; the referee doesn't build the project or run its tests. Large repositories are read selectively (about 30k tokens, the files most relevant to the questions), and the card says so.
-- **Phone fit is one phone.** 390 px wide, an iPhone-sized screen.
-- **The AI judge can be wrong, and isn't perfectly repeatable** (borderline pages can flip between runs), which is why its "yes" must quote the page or the code, low confidence goes to a person, and either side can dispute a result once.
-- **Small sample.** 37 deliveries. Enough to show the approach and catch real bugs, not enough for precise accuracy numbers.
+- **It checks pages, not whole journeys.** The referee loads the delivered page on a phone and a desktop; it doesn't log in, fill in forms or click through a checkout. Briefs that need those can link each page as its own check.
+- **The AI judge can be wrong.** That's why every AI "yes" must quote the page or the code, low-confidence answers go to a person, and either side can dispute a result.
