@@ -5,7 +5,7 @@ name: Tick
 # Needs two repository secrets: APP_URL (e.g. https://vouch-nine-omega.vercel.app) and CRON_SECRET.
 on:
   schedule:
-    - cron: "*/10 * * * *" # GitHub may run scheduled jobs a few minutes late
+    - cron: "*/30 * * * *" # every 30 min keeps Neon's free compute in budget; GitHub may run it a few minutes late
   workflow_dispatch:
 
 concurrency:

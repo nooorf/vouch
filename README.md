@@ -251,7 +251,7 @@ npm run smoke                   # PayPal sandbox smoke test
 1. Import this repository as a new Vercel project. Vercel detects Next.js, so the default build settings work; set the Node.js version to 24 in the project settings.
 2. Add the variables from `.env.local`, with `APP_URL` set to the Vercel URL. Web-app rendering in production needs `KERNEL_API_KEY`.
 3. In the PayPal developer dashboard, add a webhook for `https://<app>/api/paypal/webhook` with the six events listed in `src/lib/paypal/webhook-event.ts`, and set `PAYPAL_WEBHOOK_ID`.
-4. Add `APP_URL` and `CRON_SECRET` as GitHub repository secrets. The **Tick** workflow then brings idle jobs up to date every 10 minutes.
+4. Add `APP_URL` and `CRON_SECRET` as GitHub repository secrets. The **Tick** workflow then brings idle jobs up to date every 30 minutes.
 
 </details>
 
