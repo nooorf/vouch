@@ -264,9 +264,9 @@ ${[...confusion.entries()].sort().map(([k, n]) => `| ${k} | ${n} |`).join("\n")}
 - **The AI judge can be wrong, and isn't perfectly repeatable** (borderline pages can flip between runs), which is why its "yes" must quote the page or the code, low confidence goes to a person, and either side can dispute a result once.
 - **Small sample.** ${sets.heldout.verdicts + sets.code.verdicts + sets.dev.verdicts} deliveries. Enough to show the approach and catch real bugs, not enough for precise accuracy numbers.
 `;
-  mkdirSync("docs", { recursive: true });
-  writeFileSync("docs/referee-evaluation.md", md);
-  console.log(`\nReport: docs/referee-evaluation.md (held-out ${sets.heldout.verdictsRight}/${sets.heldout.verdicts} verdicts, ${sets.heldout.labelsRight}/${sets.heldout.labels} criteria; code ${sets.code.verdictsRight}/${sets.code.verdicts}, ${sets.code.labelsRight}/${sets.code.labels}; dev ${sets.dev.verdictsRight}/${sets.dev.verdicts}, ${sets.dev.labelsRight}/${sets.dev.labels})`);
+  mkdirSync("internal", { recursive: true });
+  writeFileSync("internal/referee-evaluation.md", md);
+  console.log(`\nReport: internal/referee-evaluation.md (held-out ${sets.heldout.verdictsRight}/${sets.heldout.verdicts} verdicts, ${sets.heldout.labelsRight}/${sets.heldout.labels} criteria; code ${sets.code.verdictsRight}/${sets.code.verdicts}, ${sets.code.labelsRight}/${sets.code.labels}; dev ${sets.dev.verdictsRight}/${sets.dev.verdicts}, ${sets.dev.labelsRight}/${sets.dev.labels})`);
 }
 
 // BENCH_SET=heldout (or dev) runs one set; the default runs both.

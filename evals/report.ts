@@ -1,5 +1,5 @@
 /**
- * Rebuild docs/referee-evaluation.md from a saved benchmark run, without running it again
+ * Rebuild internal/referee-evaluation.md from a saved benchmark run, without running it again
  * (e.g. after editing the report's wording).
  *   npm run eval:report                        # latest referee run
  *   npm run eval:report -- evals/results/referee-….json

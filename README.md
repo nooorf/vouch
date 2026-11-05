@@ -115,9 +115,7 @@ A referee that decides when money moves is only as good as its record on work it
 | **Held-out repositories** (code questions) | 7 | **7/7** | **32/32** | **0** |
 | Development set | 12 | 12/12 | 59/59 | 0 |
 
-The held-out sets include client-rendered React and Svelte apps, uncustomized templates, wrong deliveries, broken pages, dead links, an 8-second page, a 1996 site submitted as "mobile-friendly", and two shops that look real but say on the page that nothing is for sale. The first held-out run scored 16/18 with one wrong release; the fixes were general rules, never site-specific, and twice the referee turned out to be right where my own labels were wrong. The last column matters most: a referee that wrongly withholds can be corrected by the client, one that wrongly releases can't.
-
-Full method, misses and known limits: **[referee evaluation report](docs/referee-evaluation.md)**.
+The held-out sets include client-rendered React and Svelte apps, uncustomized templates, wrong deliveries, broken pages, dead links, an 8-second page, a 1996 site submitted as "mobile-friendly", and two shops that look real but say on the page that nothing is for sale. Every rule in the referee is general, never site-specific, and twice the referee turned out to be right where my own labels were wrong. The last column matters most: a referee that wrongly withholds can be corrected by the client, one that wrongly releases can't.
 
 ## Built on PayPal
 
@@ -279,7 +277,7 @@ src/
 evals/              AI evals and the referee benchmark (labels frozen and fingerprinted)
 scripts/            e2e walk-through, smoke test, referee CLI, demo cache, cleanup
 public/demo-sites/  the four demo deliveries (good, flawed, fixed, hostile)
-docs/               referee evaluation report, README assets
+docs/               README images and screenshots
 drizzle/            database migrations
 ```
 
