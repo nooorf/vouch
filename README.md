@@ -1,4 +1,3 @@
-<!-- Before submitting: replace VIDEO_URL below with the YouTube link. -->
 <div align="center">
 
 <img src="docs/assets/hero.svg" alt="Vouch: pay on proof. Freelance payments on PayPal. An AI referee checks every delivery against the agreed brief; a milestone that partly meets it releases $90 and holds $60 until a fix." width="100%">
@@ -13,7 +12,7 @@
 ![Vercel](https://img.shields.io/badge/Deploys%20on-Vercel-0d7a64?style=for-the-badge&labelColor=15181d&logo=vercel&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-5d6370?style=for-the-badge&labelColor=15181d)
 
-**[▶ 3-minute demo](VIDEO_URL) · [Try it live](https://vouch-nine-omega.vercel.app) · [How it works](#how-it-works) · [Results](#can-you-trust-the-referee) · [Where the money goes](#where-the-money-goes) · [Architecture](#architecture)**
+**[▶ 3-minute demo](https://www.youtube.com/watch?v=mfoyhSgsxrM) · [Try it live](https://vouch-nine-omega.vercel.app) · [How it works](#how-it-works) · [Results](#can-you-trust-the-referee) · [Where the money goes](#where-the-money-goes) · [Architecture](#architecture)**
 
 </div>
 
